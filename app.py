@@ -168,6 +168,7 @@ class DesktopPigeonApp:
             return
         selected = self.nest_window.family.selection()
         if selected and self.flock.rejoin(selected[0]):
+            self.social.cancel(self.pigeons)
             self.game_window.cancel()
             self._add_bird(self.flock.selected)
             self._link_selection()

@@ -47,6 +47,79 @@ class SocialUITests(unittest.TestCase):
         self.assertIsNotNone(self.app.social.collaboration)
         return self.app.social.collaboration
 
+    def departed_bird(self):
+        app = self.app
+        app.flock.treasury = 10
+        app.upgrade_nest()
+        app.lay_egg()
+        app.advance(60)
+        app.social.cancel(app.pigeons)
+        for bird in app.flock.active:
+            app.pigeons[bird.id].cancel_theft()
+            bird.forage_timer = 60
+        departed = app.flock.active[-1]
+        departed.companion.progression.neglect = 240
+        departed.companion.progression.grace = 120
+        app._depart(departed)
+        app.render()
+        app.nest_window.family.selection_set(departed.id)
+        return departed
+
+    def test_rejoin_cancels_shared_target_without_stale_reward(self):
+        app = self.app
+        departed = self.departed_bird()
+        task = self.collaborate()
+        leader = app.pigeons[task.leader]
+        leader.behavior = Behavior.STORING
+        leader.wait = .1
+        count = len(app.nest.items)
+        treasury = app.flock.treasury
+        collections = {b.id: b.companion.progression.actions["collect"]
+                       for b in app.flock.records}
+        bond = app.flock.bond(task.leader, task.partner)
+        affinity = bond.affinity
+
+        app.nest_window.rejoin_button.invoke()
+
+        self.assertEqual(app.flock.selected_id, departed.id)
+        self.assertIs(app.pigeon, app.pigeons[departed.id])
+        self.assertIsNone(app.social.collaboration)
+        self.assertIsNone(leader.treasure)
+        self.assertEqual(app.social.labels, {})
+        stories = list(app.flock.chronicle.recent)
+        app.advance(.1)
+        self.assertEqual(len(app.nest.items), count)
+        self.assertEqual(app.flock.treasury, treasury)
+        self.assertEqual({b.id: b.companion.progression.actions["collect"]
+                          for b in app.flock.records}, collections)
+        self.assertEqual(bond.affinity, affinity)
+        self.assertEqual(app.flock.chronicle.recent, stories)
+
+    def test_unsuccessful_rejoin_preserves_shared_collection(self):
+        app = self.app
+        departed = self.departed_bird()
+        app.lay_egg()
+        task = self.collaborate()
+        leader = app.pigeons[task.leader]
+        selected = app.flock.selected_id
+        labels = dict(app.social.labels)
+        count = len(app.nest.items)
+        treasury = app.flock.treasury
+
+        app.nest_window.rejoin_button.invoke()
+
+        self.assertEqual(departed.status, "departed")
+        self.assertEqual(app.flock.selected_id, selected)
+        self.assertIs(app.social.collaboration, task)
+        self.assertIs(leader.treasure, task.target)
+        self.assertEqual(app.social.labels, labels)
+        leader.behavior = Behavior.STORING
+        leader.wait = .1
+        app.advance(.1)
+        self.assertEqual(len(app.nest.items), count + 1)
+        self.assertEqual(app.flock.treasury, treasury + 1)
+        self.assertIsNone(app.social.collaboration)
+
     def test_one_shared_collection_no_duplicate_treasury_or_profile_reward(self):
         app = self.app
         task = self.collaborate()
