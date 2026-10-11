@@ -14,6 +14,7 @@ from companion import Companion, GIFTS
 from nest import Item, Nest
 from progression import Progression
 from datetime import datetime
+from flock import Flock
 
 
 class SaveError(Exception):
@@ -32,6 +33,7 @@ class Store:
     def __init__(self, directory: Path | None = None):
         self.directory = directory if directory is not None else data_directory()
         self.path = self.directory / NEST_DATA_FILE
+        self.disabled = False
 
     def load(self) -> tuple[float, Nest]:
         try:
@@ -40,10 +42,19 @@ class Store:
                 raw = handle.read(1_000_001)
             if len(raw) > 1_000_000:
                 raise ValueError("Save is too large")
-            data = json.loads(raw)
-            if type(data["version"]) is not int or data["version"] not in (1, 2, 3):
+            def unique_object(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise ValueError("Duplicate JSON field")
+                    result[key] = value
+                return result
+            data = json.loads(raw, object_pairs_hook=unique_object)
+            if type(data["version"]) is not int or data["version"] not in (1, 2, 3, 4):
                 raise ValueError("Unsupported save version")
             expected = {"version", "hunger", "items"} | ({"companion"} if data["version"] >= 2 else set())
+            if data["version"] == 4:
+                expected.add("flock")
             if set(data) != expected:
                 raise ValueError("Invalid save fields")
             hunger = data["hunger"]
@@ -74,21 +85,44 @@ class Store:
                             or set(profile_data) != set(Companion.__dataclass_fields__) - {"progression"}):
                         raise ValueError("Invalid legacy companion")
                     profile_data = dict(profile_data, progression=asdict(Progression()))
+                elif data["version"] == 3:
+                    legacy_progression = profile_data["progression"]
+                    if (type(legacy_progression) is not dict
+                            or set(legacy_progression) != set(Progression.__dataclass_fields__) - {"grace"}):
+                        raise ValueError("Invalid legacy progression")
+                    profile_data = dict(profile_data, progression=dict(legacy_progression, grace=0))
                 profile = Companion.from_data(profile_data)
             else:
                 profile = Companion(traits=dict.fromkeys(("curiosity", "calm", "sociability"), 50))
-            return float(hunger), Nest(items, profile)
+            flock = (Flock.from_data(data["flock"]) if data["version"] == 4
+                     else Flock.initial(profile, float(hunger)))
+            linked = flock.selected or flock.records[0]
+            if data["version"] == 4 and (linked.hunger != hunger or linked.companion != profile):
+                raise ValueError("Inconsistent selected profile")
+            return float(hunger), Nest(items, linked.companion, flock)
         except FileNotFoundError:
-            return 25.0, Nest()
+            nest = Nest()
+            nest.flock = Flock.initial(nest.companion)
+            return 25.0, nest
         except (OSError, ValueError, KeyError, TypeError, OverflowError, RecursionError) as exc:
+            self.disabled = True
             raise SaveError("Save unreadable; original kept. Saving disabled for this session.") from exc
 
     def save(self, hunger: float, nest: Nest) -> None:
         temporary = None
         try:
+            if self.disabled:
+                raise ValueError("Saving disabled after unreadable save")
             if type(hunger) not in (int, float) or not math.isfinite(hunger) or not 0 <= hunger <= HUNGER_MAX:
                 raise ValueError("Invalid hunger")
             Companion.from_data(asdict(nest.companion))
+            if nest.flock is None:
+                nest.flock = Flock.initial(nest.companion, hunger)
+            linked = nest.flock.selected or nest.flock.records[0]
+            if linked.companion is not nest.companion:
+                raise ValueError("Selected companion linkage lost")
+            linked.hunger = hunger
+            Flock.from_data(asdict(nest.flock))
             names = {(name, kind) for name, kind, _ in TREASURES} | {(name, "Gift") for name in GIFTS}
             if len(nest.items) > MAX_STORED_ITEMS or len({item.id for item in nest.items}) != len(nest.items):
                 raise ValueError("Invalid nest")
@@ -102,8 +136,9 @@ class Store:
                                              dir=self.directory, prefix=".nest-",
                                              suffix=".tmp", delete=False) as handle:
                 temporary = Path(handle.name)
-                json.dump({"version": 3, "hunger": hunger,
+                json.dump({"version": 4, "hunger": hunger,
                            "companion": asdict(nest.companion),
+                           "flock": asdict(nest.flock),
                            "items": [asdict(item) for item in nest.items]}, handle,
                           allow_nan=False, indent=2)
                 handle.flush()

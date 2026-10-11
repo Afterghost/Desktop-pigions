@@ -23,6 +23,7 @@ class Progression:
     intervention_cooldown: float = 0
     forage_cooldown: float = 0
     protected: list = field(default_factory=list)
+    grace: float = 0
 
     @property
     def reputation(self):
@@ -36,7 +37,7 @@ class Progression:
 
     @property
     def neglect_stage(self):
-        return ("Last Chance Coo — Preparing to Leave (awaiting reconciliation)" if self.neglect >= 240
+        return ("Last Chance Coo — Preparing to Leave" if self.neglect >= 240
                 else "Preparing to Leave" if self.neglect >= 180
                 else "Resentful" if self.neglect >= 120
                 else "Bitter" if self.neglect >= 60
@@ -60,6 +61,7 @@ class Progression:
         if self.neglect <= 0:
             return False
         self.neglect = 0
+        self.grace = 0
         self.forgiven = True
         self.unlock("The Day We Made Up")
         return True
@@ -69,8 +71,11 @@ class Progression:
             raise ValueError("Invalid active time or hunger")
         self.intervention_cooldown = max(0, self.intervention_cooldown - seconds)
         self.forage_cooldown = max(0, self.forage_cooldown - seconds)
+        previous = self.neglect
         if hunger >= 90:
             self.neglect = min(240, self.neglect + seconds)
+        if self.neglect >= 240:
+            self.grace = min(120, self.grace + max(0, seconds - max(0, 240 - previous)))
 
     @classmethod
     def from_data(cls, data):
@@ -87,10 +92,12 @@ class Progression:
                 raise ValueError("Invalid history or protection")
         if type(result.forgiven) is not bool:
             raise ValueError("Invalid forgiveness")
-        for value, maximum in ((result.neglect, 240), (result.intervention_cooldown, 10),
+        for value, maximum in ((result.neglect, 240), (result.grace, 120), (result.intervention_cooldown, 10),
                                (result.forage_cooldown, 300)):
             if not number(value, maximum):
                 raise ValueError("Invalid progression timer")
+        if result.grace and result.neglect != 240:
+            raise ValueError("Grace requires Last Chance")
         if result.forgiven != ("The Day We Made Up" in result.achievements):
             raise ValueError("Inconsistent journal")
         return result

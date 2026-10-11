@@ -11,6 +11,8 @@ class MinigameWindow:
     def __init__(self, app):
         self.app = app
         self.game = None
+        self.participant = None
+        self.game_name = None
         self.window = tk.Toplevel(app.root)
         self.window.withdraw()
         self.window.title("Desktop Pigeon — Shiny Sorting")
@@ -64,7 +66,7 @@ class MinigameWindow:
         self.window.lift()
 
     def start(self):
-        if self.app.paused or (self.game is not None and not self.game.complete):
+        if self.app.closed or not self.app.has_bird or self.app.paused or (self.game is not None and not self.game.complete):
             return
         name = self.selection.get()
         profile = self.app.nest.companion
@@ -75,22 +77,25 @@ class MinigameWindow:
             profile.progression.forage_cooldown = 300
             self.app.save()
         self.game = ShinySorting() if name == "Shiny Sorting" else LocalGame(name)
+        self.participant = self.app.flock.selected_id
+        self.game_name = name
         self._buttons(("Treasure", "Fragment") if name == "Shiny Sorting" else self.game.choices)
         self.feedback.configure(text="Buttons and marbles are treasures; foil and paper are fragments.")
         self.refresh()
 
     def answer(self, kind):
-        if self.app.paused or self.game is None or self.game.complete:
+        if (self.app.closed or self.app.paused or self.game is None or self.game.complete
+                or self.participant != self.app.flock.selected_id or not self.app.has_bird):
             return
         correct = self.game.answer(kind)
         self.feedback.configure(text="Correct!" if correct else "Not quite — try the next shiny.")
         if self.game.complete:
             score = self.game.claim_reward()
             if score is not None:
-                self.app.reward_game(score)
-                self.app.nest.companion.progression.unlock(self.selection.get())
-                self.app.save()
-                self.feedback.configure(text=self.app.activity_status)
+                if self.app.reward_game(score, self.participant):
+                    self.app.nest.companion.progression.unlock(self.game_name)
+                    self.app.save()
+                    self.feedback.configure(text=self.app.activity_status)
             else:
                 self.feedback.configure(text="No reward this time. Try again for at least 3 correct.")
         self.refresh()

@@ -58,7 +58,8 @@ class Companion:
         trait = {"care": "calm", "collect": "curiosity", "play": "sociability",
                  "govern": "calm", "return": "sociability"}[action]
         self.traits[trait] = min(100, self.traits[trait] + 1)
-        self.progression.reconcile()
+        if action in ("care", "play", "return"):
+            self.progression.reconcile()
 
     def befriend(self, points: int) -> None:
         self.friendship = min(100, self.friendship + points)

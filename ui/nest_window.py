@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from config import FOOD_TYPES, MAX_STORED_ITEMS, NEST_HEIGHT, NEST_WIDTH
+from flock import UPGRADE_COSTS
 
 
 class NestWindow:
@@ -28,6 +29,33 @@ class NestWindow:
         self.friendship.pack(fill="x", pady=3)
         self.personality = ttk.Label(frame)
         self.personality.pack(anchor="w")
+        family_frame = ttk.LabelFrame(frame, text="Family / permanent history (click active bird to select)", padding=3)
+        family_frame.pack(fill="x")
+        self.flock_summary = ttk.Label(family_frame)
+        self.flock_summary.pack(anchor="w")
+        self.family = ttk.Treeview(family_frame, columns=("name", "gen", "parent", "rep", "status"),
+                                  show="headings", height=3)
+        for column, title in (("name", "Name"), ("gen", "Gen"), ("parent", "Parent"),
+                              ("rep", "Reputation"), ("status", "Status")):
+            self.family.heading(column, text=title)
+            self.family.column(column, width=95, minwidth=30)
+        self.family.pack(fill="x")
+        self.family.bind("<<TreeviewSelect>>", lambda event: self._select_family())
+        family_scroll = ttk.Scrollbar(family_frame, orient="vertical", command=self.family.yview)
+        family_scroll.pack(side="right", fill="y")
+        self.family.configure(yscrollcommand=family_scroll.set)
+        self.legacy_info = ttk.Label(family_frame, wraplength=610)
+        self.legacy_info.pack(anchor="w")
+        growth = ttk.Frame(family_frame)
+        growth.pack(fill="x")
+        self.upgrade_button = ttk.Button(growth, command=app.upgrade_nest)
+        self.upgrade_button.pack(side="left")
+        self.egg_button = ttk.Button(growth, text="Lay egg", command=app.lay_egg)
+        self.egg_button.pack(side="left")
+        self.adopt_button = ttk.Button(growth, text="Adopt egg", command=lambda: app.lay_egg(True))
+        self.adopt_button.pack(side="left")
+        self.rejoin_button = ttk.Button(growth, text="Invite departed bird back", command=app.rejoin_history)
+        self.rejoin_button.pack(side="left")
         self.progress = ttk.Label(frame, wraplength=620)
         self.progress.pack(anchor="w")
         self.journal = ttk.Label(frame, wraplength=620)
@@ -96,6 +124,21 @@ class NestWindow:
         self.window.deiconify()
         self.window.lift()
 
+    def _select_family(self):
+        selected = self.family.selection()
+        if not selected:
+            return
+        bird = next((b for b in self.app.flock.records if b.id == selected[0]), None)
+        if bird is None:
+            return
+        if bird.legacy:
+            legacy = bird.legacy
+            self.legacy_info.configure(text=f"Legacy {bird.id}: {legacy.name} · {legacy.personality} · "
+                                       f"rep {legacy.reputation} · {legacy.lifetime:.0f}s · {legacy.reason}")
+        else:
+            self.legacy_info.configure(text=f"Identity {bird.id} · active lifetime {bird.lifetime:.0f}s")
+        self.app.select_bird(bird.id)
+
     def refresh(self) -> None:
         app = self.app
         pigeon = app.pigeon
@@ -105,7 +148,30 @@ class NestWindow:
         self.personality.configure(text=f"Personality: {profile.personality}")
         progress = profile.progression
         self.progress.configure(text=f"Reputation: {progress.reputation} — {progress.title}\n"
-                                f"Trust: {progress.neglect_stage}")
+                                f"Trust: {progress.neglect_stage}"
+                                + (f" — leaves in {120 - progress.grace:.0f} active seconds"
+                                   if progress.neglect >= 240 and app.has_bird else ""))
+        flock = app.flock
+        cost = UPGRADE_COSTS[flock.level] if flock.level < 3 else None
+        self.flock_summary.configure(text=f"{('Small', 'Expanded', 'Large', 'Grand')[flock.level]} nest: "
+                                     f"{len(flock.active)}/{flock.capacity} · treasury {flock.treasury} · "
+                                     f"cooperative coos {flock.interactions} · eggs: "
+                                     + (", ".join(f"{e.remaining:.0f}s" for e in flock.eggs) or "none"))
+        self.upgrade_button.configure(text=f"Upgrade ({cost} treasury)" if cost else "Grand nest",
+                                      state="normal" if cost and not app.paused else "disabled")
+        for button in (self.egg_button, self.adopt_button, self.rejoin_button):
+            button.configure(state="disabled" if app.paused else "normal")
+        ids = tuple(b.id for b in flock.records)
+        if self.family.get_children() != ids:
+            self.family.delete(*self.family.get_children())
+            for bird in flock.records:
+                self.family.insert("", "end", iid=bird.id)
+        by_id = {b.id: b for b in flock.records}
+        for bird in flock.records:
+            self.family.item(bird.id, values=(bird.name, bird.generation,
+                              by_id[bird.parent].name if bird.parent else "—",
+                              bird.companion.progression.reputation,
+                              bird.status + (" *" if bird.id == flock.selected_id else "")))
         self.journal.configure(text="Journal: " + (", ".join(progress.achievements[-6:]) or "No milestones yet."))
         for button in self.intervention_buttons.values():
             button.configure(state="normal" if not app.paused and pigeon.treasure is not None
@@ -135,3 +201,9 @@ class NestWindow:
                                  values=(item.name, item.kind,
                                          item.collected_at[:19].replace("T", " ")))
         self.notice.configure(text=app.save_status or "Generated overlays only. No desktop files read.")
+        if not app.has_bird:
+            self.summary.configure(text="No active pigeon — invite a departed bird or adopt an egg.")
+            for button in (self.pet_button, self.shiny_button, self.return_button,
+                           *self.food_buttons.values(), *self.intervention_buttons.values(),
+                           *self.protection_buttons.values()):
+                button.configure(state="disabled")

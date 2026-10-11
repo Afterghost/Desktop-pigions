@@ -8,6 +8,7 @@ from config import MAX_STORED_ITEMS
 from companion import Companion
 from desktop import Treasure
 from companion import GIFTS
+from flock import Flock
 
 
 @dataclass(frozen=True)
@@ -22,14 +23,17 @@ class Item:
 class Nest:
     items: list[Item] = field(default_factory=list)
     companion: Companion = field(default_factory=Companion)
+    flock: Flock | None = None
 
-    def collect(self, treasure: Treasure) -> Item:
+    def collect(self, treasure: Treasure, companion=None) -> Item:
         item = Item(str(uuid4()), treasure.name, treasure.kind,
                     datetime.now(timezone.utc).isoformat(timespec="seconds"))
         self.items.append(item)
         del self.items[:-MAX_STORED_ITEMS]
         if treasure.kind != "Gift":
-            self.companion.evolve("collect")
+            (companion or self.companion).evolve("collect")
+            if self.flock is not None:
+                self.flock.treasury = min(1_000_000, self.flock.treasury + 1)
         return item
 
     def return_item(self, item_id: str) -> bool:
