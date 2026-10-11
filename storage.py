@@ -82,4 +82,7 @@ class Store:
             raise SaveError("Could not save locally. Check the app data folder permissions.") from exc
         finally:
             if temporary is not None:
-                temporary.unlink(missing_ok=True)
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass

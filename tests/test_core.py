@@ -130,6 +130,14 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(self.store.path.read_text(), original)
         self.assertEqual(list(self.store.directory.iterdir()), [self.store.path])
 
+    def test_cleanup_permission_error_does_not_mask_save_error(self):
+        self.store.save(20, Nest())
+        with patch("storage.os.replace", side_effect=PermissionError):
+            with patch("storage.Path.unlink", side_effect=PermissionError):
+                with self.assertRaises(SaveError):
+                    self.store.save(50, Nest())
+        self.assertEqual(self.store.load()[0], 20)
+
 
 if __name__ == "__main__":
     unittest.main()
