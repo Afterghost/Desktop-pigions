@@ -112,7 +112,7 @@ class StorageTests(unittest.TestCase):
 
     def test_invalid_saves_are_preserved(self):
         self.store.directory.mkdir()
-        for content in ('{broken', '[]', '{"version":2}', json.dumps({
+        for content in ('{broken', '[]', '[' * 2000 + ']' * 2000, '{"version":2}', json.dumps({
                 "version": 1, "hunger": -1, "items": []}),
                 '{"version":1,"hunger":NaN,"items":[]}',
                 '{"version":1,"hunger":true,"items":[]}'):

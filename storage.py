@@ -61,7 +61,7 @@ class Store:
             return float(hunger), Nest(items)
         except FileNotFoundError:
             return 25.0, Nest()
-        except (OSError, ValueError, KeyError, TypeError, OverflowError) as exc:
+        except (OSError, ValueError, KeyError, TypeError, OverflowError, RecursionError) as exc:
             raise SaveError("Save unreadable; original kept. Saving disabled for this session.") from exc
 
     def save(self, hunger: float, nest: Nest) -> None:
