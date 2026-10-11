@@ -100,7 +100,7 @@ class Phase2StorageTests(unittest.TestCase):
         nest.companion.befriend(25)
         nest.collect(Treasure(GIFTS[0], "Gift", "#e6ad24", 0, 0))
         self.store.save(hunger, nest)
-        self.assertEqual(json.loads(self.store.path.read_text())["version"], 2)
+        self.assertEqual(json.loads(self.store.path.read_text())["version"], 3)
         self.assertEqual(self.store.load(), (hunger, nest))
 
     def test_invalid_phase2_data_is_preserved(self):

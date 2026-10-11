@@ -55,11 +55,21 @@ class Pigeon:
         self.fed_for = 3.0
 
     def investigate(self, treasure: Treasure) -> bool:
-        if self.treasure is not None:
+        if (self.treasure is not None or (self.companion is not None
+                and treasure.kind in self.companion.progression.protected)):
             return False
         self.treasure = treasure
         self.behavior = Behavior.INVESTIGATING
         self.wait = 0.8
+        return True
+
+    def cancel_theft(self) -> bool:
+        if self.treasure is None:
+            return False
+        self.treasure = None
+        self.behavior = Behavior.IDLE
+        self.destination = (self.x, self.y)
+        self.wait = 2
         return True
 
     def _move(self, seconds: float, speed: float) -> bool:

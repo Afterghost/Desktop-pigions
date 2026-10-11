@@ -7,6 +7,7 @@ from uuid import uuid4
 from config import MAX_STORED_ITEMS
 from companion import Companion
 from desktop import Treasure
+from companion import GIFTS
 
 
 @dataclass(frozen=True)
@@ -27,4 +28,15 @@ class Nest:
                     datetime.now(timezone.utc).isoformat(timespec="seconds"))
         self.items.append(item)
         del self.items[:-MAX_STORED_ITEMS]
+        if treasure.kind != "Gift":
+            self.companion.evolve("collect")
         return item
+
+    def return_item(self, item_id: str) -> bool:
+        item = next((item for item in self.items if item.id == item_id), None)
+        if item is None:
+            return False
+        self.items.remove(item)
+        self.companion.befriend(4 if item.kind == "Gift" and item.name in GIFTS else 2)
+        self.companion.evolve("return")
+        return True

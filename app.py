@@ -61,7 +61,9 @@ class DesktopPigeonApp:
         self.menu.add_cascade(label="Feed", menu=foods)
         self.menu.add_command(label="Offer a shiny", command=self.offer_shiny)
         self.menu.add_command(label="Pet pigeon", command=self.pet)
-        self.menu.add_command(label="Play Shiny Sorting", command=self.game_window.show)
+        self.menu.add_command(label="Play minigames", command=self.game_window.show)
+        for action in ("Shoo / catch", "Seed bribe / trade", "Laser distraction"):
+            self.menu.add_command(label=action, command=lambda action=action: self.intervene(action))
         self.pause_index = self.menu.index("end") + 1
         self.menu.add_command(label="Pause", command=self.toggle_pause)
         self.menu.add_separator()
@@ -69,7 +71,8 @@ class DesktopPigeonApp:
         for overlay in (self.bird, self.nest_overlay):
             overlay.canvas.bind("<Button-1>", lambda event: self.nest_window.show())
             overlay.canvas.bind("<Button-3>", self._popup)
-        root.bind("<Escape>", lambda event: self.close())
+        root.bind("<Escape>", lambda event: self.close()
+                  if event.widget.winfo_toplevel() == root else None)
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.render()
         if not self.saving_enabled:
@@ -104,19 +107,71 @@ class DesktopPigeonApp:
 
     def reward_game(self, score: int) -> None:
         self.nest.companion.reward_game(score)
-        self.activity_status = f"Sorting complete: +{score} friendship, +2 sunflower portions"
+        self.activity_status = f"Game complete: +{score} friendship, +2 sunflower portions"
         if score == 5:
             self.activity_status += ", +1 golden corn!"
         self.save()
         self.render()
 
     def offer_shiny(self) -> None:
+        if self.paused:
+            return
         pigeon = self.pigeon
         target = make_treasure(pigeon.bounds, pigeon.x, pigeon.y, self.rng)
         if pigeon.investigate(target):
             curiosity = self.nest.companion.traits["curiosity"] / 100
             self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL * (1.5 - curiosity)
         self.render()
+
+    def intervene(self, action: str) -> bool:
+        if action not in ("Shoo / catch", "Seed bribe / trade", "Laser distraction"):
+            raise ValueError("Unknown intervention")
+        profile = self.nest.companion
+        progress = profile.progression
+        if self.paused or progress.intervention_cooldown > 0 or self.pigeon.treasure is None:
+            self.activity_status = "No active target, paused, or intervention resting (10 active seconds)."
+            self.render()
+            return False
+        if action == "Seed bribe / trade":
+            if profile.food["sunflower_seeds"] <= 0:
+                self.activity_status = "Trade needs one earned sunflower portion."
+                self.render()
+                return False
+            profile.food["sunflower_seeds"] -= 1
+            self.pigeon.feed("sunflower_seeds")
+        self.pigeon.cancel_theft()
+        progress.intervention_cooldown = 10
+        profile.evolve("govern")
+        self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL
+        self.activity_status = f"{action}: cancelled the synthetic target. Nothing collected."
+        self.save()
+        self.render()
+        return True
+
+    def protect(self, kind):
+        if kind not in ("Treasure", "Fragment"):
+            raise ValueError("Unknown protected type")
+        if self.paused:
+            return
+        protected = self.nest.companion.progression.protected
+        if kind in protected:
+            protected.remove(kind)
+        else:
+            protected.append(kind)
+            if self.pigeon.treasure is not None and self.pigeon.treasure.kind == kind:
+                self.pigeon.cancel_theft()
+        self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL
+        self.save()
+        self.render()
+
+    def return_selected(self):
+        if self.paused:
+            return
+        selected = self.nest_window.tree.selection()
+        if selected and self.nest.return_item(selected[0]):
+            self.activity_status = "Returned a generated nest item. Coo! Friendship and trust restored."
+            self.save()
+            self.render()
 
     def toggle_pause(self) -> None:
         self.paused = not self.paused
@@ -128,6 +183,13 @@ class DesktopPigeonApp:
             return
         self.elapsed += seconds
         collected = self.pigeon.step(seconds)
+        progress = self.nest.companion.progression
+        previous_stage = progress.neglect_stage
+        progress.advance(seconds, self.pigeon.hunger)
+        if progress.neglect_stage != previous_stage and progress.neglect >= 240:
+            self.activity_status = progress.neglect_stage
+            self.nest_window.show()
+            self.save()
         if collected is not None:
             self.nest.collect(collected)
             self.save()
@@ -137,6 +199,7 @@ class DesktopPigeonApp:
             self.activity_status = f"Your pigeon brought you a gift: {gift}!"
             self.save()
         if self.elapsed >= self.next_forage and self.pigeon.treasure is None:
+            self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL
             self.offer_shiny()
         if self.elapsed >= self.next_save:
             self.save()
