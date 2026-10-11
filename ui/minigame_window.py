@@ -78,6 +78,8 @@ class MinigameWindow:
             self.app.save()
         self.game = ShinySorting() if name == "Shiny Sorting" else LocalGame(name)
         self.participant = self.app.flock.selected_id
+        self.app.flock.milestone(self.participant, "game")
+        self.app.save()
         self.game_name = name
         self._buttons(("Treasure", "Fragment") if name == "Shiny Sorting" else self.game.choices)
         self.feedback.configure(text="Buttons and marbles are treasures; foil and paper are fragments.")

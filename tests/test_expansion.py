@@ -163,7 +163,7 @@ class MigrationTests(unittest.TestCase):
             nest.companion.progression.intervention_cooldown = 7.5
             nest.companion.progression.forage_cooldown = 210
             self.store.save(hunger, nest)
-            self.assertEqual(json.loads(self.store.path.read_text())["version"], 4)
+            self.assertEqual(json.loads(self.store.path.read_text())["version"], 5)
             self.assertEqual((hunger, nest), self.store.load())
             nest.companion.evolve("care")
             self.store.save(hunger, nest)
@@ -187,7 +187,7 @@ class MigrationTests(unittest.TestCase):
             with self.subTest(key=key, value=value), self.assertRaises(SaveError):
                 self.store.load()
             self.assertEqual(raw, self.store.path.read_text())
-        for version in (False, 5, "3"):
+        for version in (False, 6, "3"):
             base["version"] = version
             raw = json.dumps(base)
             self.store.path.write_text(raw)

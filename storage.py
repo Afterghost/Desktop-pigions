@@ -15,6 +15,7 @@ from nest import Item, Nest
 from progression import Progression
 from datetime import datetime
 from flock import Flock
+from chronicle import Chronicle, Event
 
 
 class SaveError(Exception):
@@ -39,8 +40,8 @@ class Store:
         try:
             with self.path.open(encoding="utf-8") as handle:
                 # Reject oversized/corrupt saves without reading arbitrary amounts of data.
-                raw = handle.read(1_000_001)
-            if len(raw) > 1_000_000:
+                raw = handle.read(4_000_001)
+            if len(raw) > 4_000_000:
                 raise ValueError("Save is too large")
             def unique_object(pairs):
                 result = {}
@@ -50,10 +51,10 @@ class Store:
                     result[key] = value
                 return result
             data = json.loads(raw, object_pairs_hook=unique_object)
-            if type(data["version"]) is not int or data["version"] not in (1, 2, 3, 4):
+            if type(data["version"]) is not int or data["version"] not in (1, 2, 3, 4, 5):
                 raise ValueError("Unsupported save version")
             expected = {"version", "hunger", "items"} | ({"companion"} if data["version"] >= 2 else set())
-            if data["version"] == 4:
+            if data["version"] >= 4:
                 expected.add("flock")
             if set(data) != expected:
                 raise ValueError("Invalid save fields")
@@ -94,10 +95,29 @@ class Store:
                 profile = Companion.from_data(profile_data)
             else:
                 profile = Companion(traits=dict.fromkeys(("curiosity", "calm", "sociability"), 50))
-            flock = (Flock.from_data(data["flock"]) if data["version"] == 4
-                     else Flock.initial(profile, float(hunger)))
+            if data["version"] >= 4:
+                flock_data = data["flock"]
+                if data["version"] == 4:
+                    old_fields = set(Flock.__dataclass_fields__) - {"bonds", "chronicle"}
+                    if type(flock_data) is not dict or set(flock_data) != old_fields:
+                        raise ValueError("Invalid legacy flock fields")
+                    origins = [asdict(Event("origins", [b["id"]], b["companion"]["traits"]))
+                               for b in flock_data["records"]]
+                    origins += [asdict(Event("egg_origins", [e["id"]], e["traits"]))
+                                for e in flock_data["eggs"]]
+                    flock_data = dict(flock_data, bonds=[], chronicle={"core": origins, "recent": []})
+                flock = Flock.from_data(flock_data)
+            else:
+                flock = Flock.initial(profile, float(hunger))
+            if data["version"] < 5:
+                flock.chronicle = Chronicle()
+                for identity in flock.records + flock.eggs:
+                    traits = (identity.companion.traits if hasattr(identity, "companion")
+                              else identity.traits)
+                    flock.chronicle.record("origins" if hasattr(identity, "companion") else "egg_origins",
+                                           [identity.id], traits)
             linked = flock.selected or flock.records[0]
-            if data["version"] == 4 and (linked.hunger != hunger or linked.companion != profile):
+            if data["version"] >= 4 and (linked.hunger != hunger or linked.companion != profile):
                 raise ValueError("Inconsistent selected profile")
             return float(hunger), Nest(items, linked.companion, flock)
         except FileNotFoundError:
@@ -136,7 +156,7 @@ class Store:
                                              dir=self.directory, prefix=".nest-",
                                              suffix=".tmp", delete=False) as handle:
                 temporary = Path(handle.name)
-                json.dump({"version": 4, "hunger": hunger,
+                json.dump({"version": 5, "hunger": hunger,
                            "companion": asdict(nest.companion),
                            "flock": asdict(nest.flock),
                            "items": [asdict(item) for item in nest.items]}, handle,

@@ -14,6 +14,7 @@ from pigeon import Behavior, Pigeon
 from storage import SaveError, Store
 from flock import Flock, LIFETIME_LIMIT, HISTORY_LIMIT
 from progression import number
+from social import SocialMotion
 from ui.nest_window import NestWindow
 from ui.overlay import Overlay
 from ui.pigeon_sprite import draw_pigeon
@@ -46,6 +47,7 @@ class DesktopPigeonApp:
         self.birds = {}
         self.targets = {}
         self.effects = []
+        self.social = SocialMotion()
         self.rng = random.Random()
         self.paused = False
         self.closed = False
@@ -131,6 +133,7 @@ class DesktopPigeonApp:
         if self.closed or bird_id not in self.pigeons:
             return False
         if bird_id != self.flock.selected_id:
+            self.social.cancel(self.pigeons)
             self.game_window.cancel()
             self.flock.selected_id = bird_id
             self._link_selection()
@@ -175,6 +178,12 @@ class DesktopPigeonApp:
         self.render()
 
     def _depart(self, record):
+        task = self.social.collaboration
+        if task and record.id in (task.leader, task.partner):
+            self.social.cancel(self.pigeons)
+        if ((self.social.avoidance and record.id in self.social.avoidance[:2])
+                or (self.social.greeting and record.id in self.social.greeting[:2])):
+            self.social.cancel(self.pigeons)
         pigeon = self.pigeons.pop(record.id)
         pigeon.cancel_theft()
         overlay = self.birds.pop(record.id)
@@ -207,6 +216,8 @@ class DesktopPigeonApp:
             self.render()
             return
         self.pigeon.feed(food)
+        if self.nest.companion.progression.actions["care"]:
+            self.flock.milestone(self.flock.selected_id, "care")
         self.activity_status = "Coo! Thank you for the food."
         self.save()
         self.render()
@@ -217,6 +228,7 @@ class DesktopPigeonApp:
         if self.paused:
             self.activity_status = "Resume to spend time with your pigeon."
         elif self.nest.companion.pet():
+            self.flock.milestone(self.flock.selected_id, "care")
             self.activity_status = "A gentle head scratch! Friendship increased."
             self.save()
         else:
@@ -228,6 +240,7 @@ class DesktopPigeonApp:
                 or (participant is not None and participant != self.flock.selected_id)):
             return False
         self.nest.companion.reward_game(score)
+        self.flock.milestone(self.flock.selected_id, "win")
         self.activity_status = f"Game complete: +{score} friendship, +2 sunflower portions"
         if score == 5:
             self.activity_status += ", +1 golden corn!"
@@ -239,6 +252,11 @@ class DesktopPigeonApp:
         if self.closed or self.paused or not self.has_bird:
             return
         pigeon = self.pigeon
+        task = self.social.collaboration
+        if task and self.flock.selected_id in (task.leader, task.partner):
+            return
+        if self.social.greeting and self.flock.selected_id in self.social.greeting[:2]:
+            return
         target = make_treasure(pigeon.bounds, pigeon.x, pigeon.y, self.rng)
         if pigeon.investigate(target):
             curiosity = self.nest.companion.traits["curiosity"] / 100
@@ -262,6 +280,7 @@ class DesktopPigeonApp:
             profile.food["sunflower_seeds"] -= 1
             self.pigeon.feed("sunflower_seeds")
             progress.reconcile()
+        self.social.cancel(self.pigeons)
         self.pigeon.cancel_theft()
         progress.intervention_cooldown = 10
         profile.evolve("govern")
@@ -281,6 +300,10 @@ class DesktopPigeonApp:
             protected.remove(kind)
         else:
             protected.append(kind)
+            task = self.social.collaboration
+            if (task and self.flock.selected_id in (task.leader, task.partner)
+                    and task.target.kind == kind):
+                self.social.cancel(self.pigeons)
             if self.pigeon.treasure is not None and self.pigeon.treasure.kind == kind:
                 self.pigeon.cancel_theft()
         self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL
@@ -310,6 +333,9 @@ class DesktopPigeonApp:
         if self.closed or self.paused:
             return
         self.elapsed += seconds
+        self.social.advance(seconds, self.flock, self.pigeons)
+        deliveries = []
+        gifts = []
         for record in list(self.flock.active):
             pigeon = self.pigeons[record.id]
             progress = record.companion.progression
@@ -320,7 +346,11 @@ class DesktopPigeonApp:
                 active_seconds = min(seconds, 240 - progress.neglect + 120 - progress.grace)
             elif progress.neglect >= 240:
                 active_seconds = min(seconds, 120 - progress.grace)
-            collected = pigeon.step(active_seconds)
+            task = self.social.collaboration
+            controlled = (task and record.id == task.partner) or (
+                self.social.avoidance and record.id == self.social.avoidance[0]) or (
+                self.social.greeting and record.id in self.social.greeting[:2])
+            collected = pigeon.step(active_seconds, social_movement=bool(controlled))
             record.hunger = pigeon.hunger
             record.lifetime = min(LIFETIME_LIMIT, record.lifetime + active_seconds)
             progress.advance(active_seconds, pigeon.hunger)
@@ -332,20 +362,38 @@ class DesktopPigeonApp:
                 self.nest_window.show()
                 self.save()
             if collected is not None:
-                self.nest.collect(collected, record.companion)
-                self.save()
+                deliveries.append((record, collected,
+                                   task if task and task.leader == record.id else None))
             gift = record.companion.advance(active_seconds, self.rng)
             if gift is not None:
-                self.nest.collect(Treasure(gift, "Gift", "#e6ad24", *self.nest_position),
-                                  record.companion)
-                self.activity_status = f"Your pigeon brought you a gift: {gift}!"
-                self.save()
-            if record.id != self.flock.selected_id and pigeon.treasure is None:
+                gifts.append((record, gift))
+            if record.id != self.flock.selected_id and pigeon.treasure is None and not controlled:
                 record.forage_timer = max(0, record.forage_timer - active_seconds)
                 if record.forage_timer == 0:
                     pigeon.investigate(make_treasure(pigeon.bounds, pigeon.x, pigeon.y, self.rng))
                     curiosity = record.companion.traits["curiosity"] / 100
                     record.forage_timer = AUTO_FORAGE_INTERVAL * (1.5 - curiosity)
+        for record, collected, task in deliveries:
+            if record.status != "active":
+                continue
+            if task:
+                if task is not self.social.collaboration:
+                    continue
+                if not self.social.finish(record.id, collected, self.flock, self.pigeons):
+                    continue
+                self.activity_status = f"{record.name} and a friend stored one shared treasure."
+            self.nest.collect(collected, record.companion)
+            self.flock.milestone(record.id, "treasure")
+            self.save()
+        for record, gift in gifts:
+            self.nest.collect(Treasure(gift, "Gift", "#e6ad24", *self.nest_position),
+                              record.companion)
+            self.flock.milestone(record.id, "gift")
+            partner = self.social.share_gift(record.id, self.flock, self.pigeons)
+            self.activity_status = (f"{record.name} and a flock friend delivered one shared gift: {gift}!"
+                                    if partner else f"{record.name} brought a gift: {gift}!")
+            self.save()
+        interactions = self.flock.interactions
         hatched = self.flock.advance(seconds)
         for record in hatched:
             self._add_bird(record)
@@ -353,8 +401,10 @@ class DesktopPigeonApp:
             self._link_selection()
             self.activity_status = f"{len(hatched)} pigeon(s) hatched — generation {hatched[-1].generation}."
             self.save()
-        if self.flock.interactions and self.flock.social_timer == 0:
-            self.activity_status = "Flock coo: +1 friendship together; elder shared calm with younger birds."
+        if self.flock.interactions != interactions:
+            self.social.start(self.flock, self.pigeons,
+                              lambda bird: make_treasure(bird.bounds, bird.x, bird.y, self.rng))
+            self.activity_status = "Flock met: mutual bonds changed; elders shared calm."
         for effect, expiry in list(self.effects):
             if self.elapsed >= expiry:
                 effect.window.destroy()
@@ -382,6 +432,10 @@ class DesktopPigeonApp:
         for bird_id, pigeon in self.pigeons.items():
             overlay = self.birds[bird_id]
             draw_pigeon(overlay.canvas, pigeon, self.elapsed, self.paused)
+            label = self.social.labels.get(bird_id)
+            if label:
+                overlay.canvas.create_text(PIGEON_SIZE // 2, 12, text=label,
+                                           fill="#825019", font=("TkDefaultFont", 8))
             overlay.place(pigeon.x, pigeon.y)
             shiny = self.targets[bird_id]
             if pigeon.treasure is not None and not pigeon.carrying:
@@ -417,6 +471,7 @@ class DesktopPigeonApp:
                 return
         self.closed = True
         self.game_window.cancel()
+        self.social.cancel(self.pigeons)
         for pigeon in self.pigeons.values():
             pigeon.cancel_theft()
         if self.tick_id is not None:

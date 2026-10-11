@@ -86,11 +86,13 @@ class Pigeon:
         )
         return False
 
-    def step(self, seconds: float) -> Treasure | None:
+    def step(self, seconds: float, social_movement: bool = False) -> Treasure | None:
         if not math.isfinite(seconds) or seconds < 0:
             raise ValueError("Elapsed time must be finite and non-negative")
         self.hunger = advance_hunger(self.hunger, seconds)
         self.fed_for = max(0, self.fed_for - seconds)
+        if social_movement and self.treasure is None:
+            return None
         if self.behavior in (Behavior.IDLE, Behavior.INVESTIGATING,
                              Behavior.THEFT, Behavior.STORING):
             self.wait -= seconds

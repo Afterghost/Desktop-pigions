@@ -1,4 +1,4 @@
-# Desktop Pigeon — Phase 1–3 gameplay and Phase 4 core
+# Desktop Pigeon — flock interactions and family stories
 
 A local-only pigeon flock for your desktop. Each bird walks, rests, pecks at
 generated shinies, carries them home, and gets hungry. No account, service,
@@ -27,7 +27,8 @@ Windows is the intended desktop target; multi-monitor roaming is not implemented
 
 - **Left-click a pigeon** to select it and open the nest panel; click the nest to open it.
   Feeding, protection, intervention, games, and item returns affect the selected bird.
-  The family/history list also selects active birds. Changing birds cancels unfinished games.
+  The family/history list also selects active birds. Changing birds cancels unfinished games
+  and cooperative collections without a reward.
 - **Right-click either** for feeding, nest, pause/resume, or quit.
 - **Offer a shiny** starts a collection immediately. The pigeon also finds one
   automatically after about six seconds, then every 21–39 seconds depending on
@@ -142,15 +143,50 @@ Windows is the intended desktop target; multi-monitor roaming is not implemented
   **Invite departed bird back** requires a free slot (reserved eggs count), restores
   the same identity/profile, and reconciles grace without removing the legacy.
   Active IDs cannot be duplicated. Parent generation validation forbids cycles.
-- Every 30 active seconds with two or more birds, a cooperative coo grants each
-  +1 friendship; the longest-lived active bird mentors the others with +1 calm
-  (both capped at 100). Counts and a visible notification make this observable.
+- Every **30 active seconds** with two or more birds, mutual flock bonds change.
+  Affinity is **−100 to +100**, separate from friendship with the human:
+  **Friendship at +20**, **Rivalry at −20**, otherwise Acquaintance. Similar traits
+  build affinity; incompatible traits erode it; low-calm birds occasionally clash.
+  The nest shows selected-bird bonds; the stories window lists all mutual bonds.
+- Available friends begin **shared foraging/cooperative collection**: one bird owns
+  the generated target while its friend visibly follows within the work area.
+  One stored item earns exactly **one treasury unit and one collector reward**,
+  not a second item/reward for the helper. Cooperation improves the pair's affinity.
+  Overlays show “Shared forage” and “Following friend”. Attempts expire after
+  30 active seconds; selection changes, protection, intervention, target cancellation,
+  or either participant's departure abort unfinished cooperation without rewards.
+  Both participants' protected Treasure/Fragment types are respected.
+- When an available friend's ordinary two-minute gift timer pays out, a friend can
+  escort them home for five active seconds: “Shared gift” / “Gift escort”.
+  This is **one gift**, no extra treasury or food, and a small mutual affinity gain.
+  Busy birds deliver alone. Rivals give space for five active seconds; this never
+  removes nest items, changes hunger, or blocks feeding. Elders (longer active
+  lifetimes) mentor younger birds with +1 calm per meeting, not human friendship,
+  and cannot reconcile neglect. Pause freezes all social movement and cadence.
+- Pair bonds survive departure and return, never duplicate, and inactive pairs do
+  not meet. At **200 permanent pairs**, new pairs are refused; old bonds are never
+  pruned. Existing identities can still hatch/return, but pairs beyond the cap have
+  no simulated social relationship.
+- **Family stories / activity** opens a separate scrollable small window.
+  Select a family/history record as its anchor, then filter **All**, **Ancestors**,
+  **Descendants** (including the anchor), or **Lineage** (the founding ancestor's
+  descendants). Parent names, generation counts, bonds and stories remain available
+  even when all birds have departed.
+- Structured local facts produce deterministic prose for founding, incubation,
+  hatching (snapshotted inherited traits and parent), first recorded care, treasure,
+  gift, game and win, friendships, rivalries, reconciliation, elder mentorship,
+  departure legacy and return. Family facts and first milestones are permanent;
+  repeated interactions occupy a separate **latest-60 activity feed**, whose oldest
+  entries are explicitly pruned. The core has a validated **4,000-event ceiling**
+  (the 100 identities / 200 pairs bound keeps reachable unique core facts below it).
+  Migration records family origins only, not previously unobserved achievements;
+  “first recorded” milestones describe observations since stories were enabled.
 - Permanent identities (birds plus eggs) are limited to **100** so saves stay bounded.
   At that explicit limit new eggs are refused; departed history is **never pruned**.
 - **Intentional limits:** this is a modular core, not full GDD Phase 4. No breeding
-  pairs, egg artwork, flock pathfinding, advanced cooperative theft, aging/death,
-  heir succession, custom names, or full generation/elder narrative is implemented.
-  Coos and mentoring are simple bounded shared-time bonuses, not simulated social AI.
+  pairs, egg artwork, obstacle-aware flock pathfinding, aging/death, heir succession,
+  custom names, or language-model-generated fiction is implemented. Social routines
+  are bounded local model behaviors, not desktop observation or a giant social simulation.
 
 ## Local data and privacy
 
@@ -162,15 +198,17 @@ Only the app’s own `nest_data.json` is read/written:
 The versioned save contains hunger, friendship, traits, food portions, cooldowns,
 game win count, bounded achievements/action counts, neglect/cooldown timers,
 forgiveness, protected synthetic types, and generated item names/types/IDs/times.
-Existing version 1/2/3 saves are read without rewriting and upgrade to **version 4**
+Existing version 1/2/3/4 saves are read without rewriting and upgrade to **version 5**
 on the next successful save, preserving hunger, items, and all existing version 2
 traits/food/friendship/timers/wins. Version 1 has no traits, so migration supplies
 deterministic neutral traits rather than rerolling them. Version 3 preserves
 evolved traits exactly across reloads. Version 4 adds per-bird hunger/lifetime,
 identities, parentage, permanent departure legacy, grace, eggs, nest level/treasury,
-selected ID and social timers. All saved fields and cross-record references are validated.
+selected ID and social timers. Version 5 adds bounded mutual bonds and structured
+permanent/recent chronicles, retaining every earlier profile, egg, item and legacy.
+All saved fields, counters, finite timers and cross-record references are validated.
 Unsupported/corrupt saves remain intact.
-Downgrading to earlier phases cannot read version 4 saves; keep a
+Downgrading to earlier phases cannot read version 5 saves; keep a
 manual backup of the app's own save before downgrading.
 Saves occur on feeding, collection, every ten active seconds, and exit, using
 atomic replacement. Position and unfinished thefts are not persisted. If a save
@@ -199,13 +237,15 @@ features are not enabled by this MVP.
 - `minigames.py`: shared UI-independent local game rounds and one-time reward claims.
 - `progression.py`: bounded reputation milestones, active neglect, and forgiveness.
 - `flock.py`: identities, capacity/treasury, eggs, legacy, mentoring and validation.
+- `social.py`: mutual affinity, compatibility, cooperation, gift escorts and yielding.
+- `chronicle.py`: validated local facts, deterministic prose and family filters.
 - `storage.py`: local, versioned, atomic persistence.
 - `app.py`: simulation/UI coordination and save lifecycle.
 - `ui/`: procedural pigeon sprite, small overlays, and nest controls.
 - `config.py`: tunable values; `main.py`: startup.
 
 The core modules do not import Tkinter. Future arcade expansion, full GDD reputation,
-advanced flocking, and generation narratives can extend the model and treasure provider
+additional flock routines and generation narratives can extend the model and treasure provider
 without needing desktop-content access.
 
 Run the standard-library tests from the repository root:
@@ -232,6 +272,10 @@ as well. No separate lint/build tooling or CI existed in the starting repository
   paused, suspended and closed intervals must not consume timers.
 - Invite the departed bird back from history, check its ID, traits and legacy;
   confirm rejoin is refused at capacity and cannot duplicate a bird.
+- Observe friendships, follow/escort overlays, and rivalry yielding. Protect either
+  participant's target type or switch selection during cooperation: no stale collection
+  should appear. Pause midway and verify the helper freezes too. Open family stories,
+  filter an ancestor/descendant/lineage, and reopen after all birds depart.
 - Quit/relaunch a five-bird flock; verify per-bird hunger, selected ID, eggs and
   history. Back up the app save before testing migration/corruption: old saves
   should migrate on save; malformed/unsupported saves must remain unchanged.

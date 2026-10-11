@@ -5,6 +5,8 @@ from uuid import uuid4, UUID
 
 from companion import Companion, TRAITS
 from progression import number
+from chronicle import Chronicle
+from social import Bond, BOND_LIMIT, socialize
 
 CAPACITIES = (1, 2, 3, 5)
 UPGRADE_COSTS = (5, 10, 20)
@@ -54,11 +56,30 @@ class Flock:
     selected_id: str | None = None
     social_timer: float = 0
     interactions: int = 0
+    bonds: list = field(default_factory=list)
+    chronicle: Chronicle = field(default_factory=Chronicle)
 
     @classmethod
     def initial(cls, companion, hunger=25):
         bird = BirdRecord(companion=companion, hunger=hunger)
-        return cls(records=[bird], selected_id=bird.id)
+        result = cls(records=[bird], selected_id=bird.id)
+        result.chronicle.record("founding", [bird.id], bird.companion.traits)
+        return result
+
+    def bond(self, first, second, create=False):
+        actors = sorted([first, second])
+        if first == second or any(i not in {b.id for b in self.records} for i in actors):
+            return None
+        existing = next((b for b in self.bonds if b.actors == actors), None)
+        if existing or not create or len(self.bonds) >= BOND_LIMIT:
+            return existing
+        result = Bond(actors)
+        self.bonds.append(result)
+        return result
+
+    def milestone(self, bird_id, kind):
+        if not any(e.key == (kind, bird_id) for e in self.chronicle.core):
+            self.chronicle.record(kind, [bird_id])
 
     @property
     def capacity(self):
@@ -88,8 +109,9 @@ class Flock:
             return False
         traits = {key: (parent.companion.traits[key] + 50) // 2 if parent else 50
                   for key in TRAITS}
-        self.eggs.append(Egg(str(uuid4()), parent_id,
-                             parent.generation + 1 if parent else 1, traits))
+        egg = Egg(str(uuid4()), parent_id, parent.generation + 1 if parent else 1, traits)
+        self.eggs.append(egg)
+        self.chronicle.record("egg", [egg.id], traits)
         return True
 
     def depart(self, bird):
@@ -100,6 +122,7 @@ class Flock:
             bird.legacy = Legacy(bird.name, bird.companion.personality,
                                  bird.companion.progression.reputation, bird.lifetime)
         bird.status = "departed"
+        self.milestone(bird.id, "departure")
         if self.selected_id == bird.id:
             self.selected_id = self.active[0].id if self.active else None
         return True
@@ -112,6 +135,7 @@ class Flock:
         bird.status = "active"
         bird.companion.progression.reconcile()
         self.selected_id = bird.id
+        self.milestone(bird.id, "return")
         return True
 
     def advance(self, seconds):
@@ -126,6 +150,7 @@ class Flock:
                                   companion=Companion(traits=dict(egg.traits)))
                 self.records.append(bird)
                 self.eggs.remove(egg)
+                self.chronicle.record("hatch", [bird.id], egg.traits)
                 hatched.append(bird)
                 if self.selected_id is None:
                     self.selected_id = bird.id
@@ -134,11 +159,7 @@ class Flock:
             if self.social_timer >= 30:
                 self.social_timer = 0
                 self.interactions = min(1_000_000, self.interactions + 1)
-                elder = max(self.active, key=lambda b: b.lifetime)
-                for bird in self.active:
-                    bird.companion.befriend(1)
-                    if bird != elder:
-                        bird.companion.traits["calm"] = min(100, bird.companion.traits["calm"] + 1)
+                socialize(self)
         return hatched
 
     @classmethod
@@ -221,4 +242,25 @@ class Flock:
              (type(result.selected_id) is not str or result.selected_id not in {b.id for b in result.active}))
                 or (bool(result.active) != (result.selected_id is not None))):
             raise ValueError("Invalid selected bird")
+        if type(result.bonds) is not list or len(result.bonds) > BOND_LIMIT:
+            raise ValueError("Invalid bonds")
+        bonds, pairs = [], set()
+        for entry in result.bonds:
+            if type(entry) is not dict or set(entry) != set(Bond.__dataclass_fields__):
+                raise ValueError("Invalid bond fields")
+            bond = Bond(**entry)
+            if (type(bond.actors) is not list or len(bond.actors) != 2
+                    or any(type(i) is not str or i not in by_id for i in bond.actors)
+                    or bond.actors != sorted(set(bond.actors))
+                    or tuple(bond.actors) in pairs
+                    or type(bond.affinity) is not int or not -100 <= bond.affinity <= 100
+                    or type(bond.meetings) is not int or not 0 <= bond.meetings <= 1_000_000):
+                raise ValueError("Invalid pair bond")
+            pairs.add(tuple(bond.actors))
+            bonds.append(bond)
+        result.bonds = bonds
+        result.chronicle = Chronicle.from_data(result.chronicle, result)
+        for event in result.chronicle.core + result.chronicle.recent:
+            if len(event.actors) == 2 and tuple(sorted(event.actors)) not in pairs:
+                raise ValueError("Event without observed bond")
         return result

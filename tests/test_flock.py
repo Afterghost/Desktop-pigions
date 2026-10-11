@@ -123,7 +123,7 @@ class FlockStorageTests(unittest.TestCase):
                 self.assertEqual(nest.companion.friendship, 47)
                 self.assertEqual(nest.companion.traits, profile["traits"])
             self.store.save(hunger, nest)
-            self.assertEqual(json.loads(self.store.path.read_text())["version"], 4)
+            self.assertEqual(json.loads(self.store.path.read_text())["version"], 5)
             self.assertEqual(self.store.load(), (hunger, nest))
 
     def test_corrupt_flock_fields_and_references_disable_saving(self):

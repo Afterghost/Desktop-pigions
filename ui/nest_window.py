@@ -5,11 +5,13 @@ from tkinter import ttk
 
 from config import FOOD_TYPES, MAX_STORED_ITEMS, NEST_HEIGHT, NEST_WIDTH
 from flock import UPGRADE_COSTS
+from ui.story_window import StoryWindow
 
 
 class NestWindow:
     def __init__(self, app):
         self.app = app
+        self.stories = StoryWindow(app)
         self.window = tk.Toplevel(app.root)
         self.window.withdraw()
         self.window.title("Desktop Pigeon — Nest")
@@ -66,6 +68,10 @@ class NestWindow:
         self.pet_button.pack(side="left")
         ttk.Button(social, text="Play minigames",
                    command=lambda: app.game_window.show()).pack(side="left", padx=5)
+        ttk.Button(social, text="Family stories / activity",
+                   command=self.stories.show).pack(side="left")
+        self.bonds = ttk.Label(frame, wraplength=540)
+        self.bonds.pack(anchor="w")
         self.activity = ttk.Label(frame, wraplength=540)
         self.activity.pack(anchor="w", pady=3)
         governance = ttk.LabelFrame(frame, text="Visible synthetic targets only", padding=4)
@@ -155,7 +161,7 @@ class NestWindow:
         cost = UPGRADE_COSTS[flock.level] if flock.level < 3 else None
         self.flock_summary.configure(text=f"{('Small', 'Expanded', 'Large', 'Grand')[flock.level]} nest: "
                                      f"{len(flock.active)}/{flock.capacity} · treasury {flock.treasury} · "
-                                     f"cooperative coos {flock.interactions} · eggs: "
+                                     f"social meetings {flock.interactions} · eggs: "
                                      + (", ".join(f"{e.remaining:.0f}s" for e in flock.eggs) or "none"))
         self.upgrade_button.configure(text=f"Upgrade ({cost} treasury)" if cost else "Grand nest",
                                       state="normal" if cost and not app.paused else "disabled")
@@ -173,6 +179,15 @@ class NestWindow:
                               bird.companion.progression.reputation,
                               bird.status + (" *" if bird.id == flock.selected_id else "")))
         self.journal.configure(text="Journal: " + (", ".join(progress.achievements[-6:]) or "No milestones yet."))
+        bonds = sorted((b for b in flock.bonds if flock.selected_id in b.actors),
+                       key=lambda b: all(by_id[i].status == "active" for i in b.actors), reverse=True)
+        self.bonds.configure(text="Flock bonds (not human friendship): " + (
+            "; ".join(f"{by_id[next(i for i in bond.actors if i != flock.selected_id)].name}: "
+                      f"{bond.status} {bond.affinity:+d}"
+                      for bond in bonds[:2]) or "none yet")
+            + (f" · {len(bonds) - 2} more in stories" if len(bonds) > 2 else ""))
+        if self.stories.window.state() != "withdrawn":
+            self.stories.refresh()
         for button in self.intervention_buttons.values():
             button.configure(state="normal" if not app.paused and pigeon.treasure is not None
                              and progress.intervention_cooldown == 0 else "disabled")
