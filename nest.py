@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from config import MAX_STORED_ITEMS
+from companion import Companion
 from desktop import Treasure
 
 
@@ -19,6 +20,7 @@ class Item:
 @dataclass
 class Nest:
     items: list[Item] = field(default_factory=list)
+    companion: Companion = field(default_factory=Companion)
 
     def collect(self, treasure: Treasure) -> Item:
         item = Item(str(uuid4()), treasure.name, treasure.kind,

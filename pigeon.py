@@ -10,6 +10,7 @@ from config import (
     THEFT_APPROACH_SPEED, THEFT_ESCAPE_SPEED,
 )
 from desktop import Bounds, Treasure
+from companion import Companion
 from feeding import advance_hunger, feed, hunger_state
 
 
@@ -25,7 +26,8 @@ class Behavior(Enum):
 
 class Pigeon:
     def __init__(self, bounds: Bounds, nest_position: tuple[float, float],
-                 hunger: float = 25, rng: random.Random | None = None):
+                 hunger: float = 25, rng: random.Random | None = None,
+                 companion: Companion | None = None):
         self.bounds = bounds
         self.rng = rng if rng is not None else random.Random()
         self.x, self.y = bounds.clamp(bounds.x + bounds.width / 2,
@@ -38,6 +40,7 @@ class Pigeon:
         self.treasure: Treasure | None = None
         self.facing_right = True
         self.fed_for = 0.0
+        self.companion = companion
 
     @property
     def hunger_label(self) -> str:
@@ -101,7 +104,8 @@ class Pigeon:
         elif self.behavior == Behavior.ROAMING:
             if self._move(seconds, BASE_MOVEMENT_SPEED):
                 self.behavior = Behavior.IDLE
-                self.wait = self.rng.uniform(IDLE_DURATION_MIN, IDLE_DURATION_MAX) / 1000
+                calm = self.companion.traits["calm"] / 100 if self.companion else 0.5
+                self.wait = self.rng.uniform(IDLE_DURATION_MIN, IDLE_DURATION_MAX) / 1000 * (0.5 + calm)
         elif self.behavior == Behavior.APPROACHING:
             if self._move(seconds, THEFT_APPROACH_SPEED):
                 self.behavior = Behavior.THEFT

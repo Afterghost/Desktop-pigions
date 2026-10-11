@@ -12,8 +12,8 @@ class NestWindow:
         self.window = tk.Toplevel(app.root)
         self.window.withdraw()
         self.window.title("Desktop Pigeon — Nest")
-        self.window.geometry(f"{NEST_WIDTH}x{NEST_HEIGHT}")
-        self.window.minsize(540, 400)
+        self.window.geometry(f"{NEST_WIDTH}x{NEST_HEIGHT + 160}")
+        self.window.minsize(540, 560)
         self.window.protocol("WM_DELETE_WINDOW", self.window.withdraw)
         self.window.bind("<Escape>", lambda event: self.window.withdraw())
         frame = ttk.Frame(self.window, padding=12)
@@ -22,7 +22,21 @@ class NestWindow:
         self.summary.pack(anchor="w")
         self.hunger = ttk.Progressbar(frame, maximum=100)
         self.hunger.pack(fill="x", pady=(5, 8))
-        food_frame = ttk.LabelFrame(frame, text="Feed your pigeon (free in Phase 1)", padding=5)
+        self.relationship = ttk.Label(frame)
+        self.relationship.pack(anchor="w")
+        self.friendship = ttk.Progressbar(frame, maximum=100)
+        self.friendship.pack(fill="x", pady=3)
+        self.personality = ttk.Label(frame)
+        self.personality.pack(anchor="w")
+        social = ttk.Frame(frame)
+        social.pack(fill="x", pady=5)
+        self.pet_button = ttk.Button(social, text="Pet pigeon", command=app.pet)
+        self.pet_button.pack(side="left")
+        ttk.Button(social, text="Play Shiny Sorting",
+                   command=lambda: app.game_window.show()).pack(side="left", padx=5)
+        self.activity = ttk.Label(frame, wraplength=540)
+        self.activity.pack(anchor="w", pady=3)
+        food_frame = ttk.LabelFrame(frame, text="Feed (seed mix is always free)", padding=5)
         food_frame.pack(fill="x")
         self.food_buttons = {}
         for index, food in enumerate(FOOD_TYPES):
@@ -64,13 +78,23 @@ class NestWindow:
     def refresh(self) -> None:
         app = self.app
         pigeon = app.pigeon
+        profile = app.nest.companion
+        self.relationship.configure(text=f"Friendship: {profile.friendship}/100 — {profile.relationship}")
+        self.friendship["value"] = profile.friendship
+        self.personality.configure(text=f"Personality: {profile.personality}")
+        self.activity.configure(text=app.activity_status)
+        self.pet_button.configure(state="disabled" if app.paused or profile.pet_cooldown > 0 else "normal")
+        for food, button in self.food_buttons.items():
+            portions = "free" if food == "seed_mix" else str(profile.food[food])
+            button.configure(text=f"{food.replace('_', ' ').title()} ({portions})",
+                             state="normal" if food == "seed_mix" or profile.food[food] else "disabled")
         self.summary.configure(text=f"Hunger: {pigeon.hunger_label} ({pigeon.hunger:.0f}/100)"
                                f" — {'Paused' if app.paused else pigeon.behavior.value}")
         self.hunger["value"] = pigeon.hunger
         self.pause_button.configure(text="Resume" if app.paused else "Pause")
         self.shiny_button.configure(state="disabled" if pigeon.treasure else "normal")
         self.inventory_label.configure(
-            text=f"Nest: {len(app.nest.items)} treasures / fragments (keeps latest {MAX_STORED_ITEMS})")
+            text=f"Nest: {len(app.nest.items)} treasures / fragments / gifts (latest {MAX_STORED_ITEMS})")
         ids = tuple(item.id for item in reversed(app.nest.items))
         if self.tree.get_children() != ids:
             self.tree.delete(*self.tree.get_children())

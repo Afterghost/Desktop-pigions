@@ -8,13 +8,14 @@ from tkinter import messagebox
 from config import (
     AUTO_FORAGE_INTERVAL, FOOD_TYPES, MOVEMENT_UPDATE_INTERVAL, PIGEON_SIZE, SAVE_INTERVAL,
 )
-from desktop import make_treasure, work_area
+from desktop import Treasure, make_treasure, work_area
 from nest import Nest
 from pigeon import Behavior, Pigeon
 from storage import SaveError, Store
 from ui.nest_window import NestWindow
 from ui.overlay import Overlay
 from ui.pigeon_sprite import draw_pigeon
+from ui.minigame_window import MinigameWindow
 
 
 class DesktopPigeonApp:
@@ -34,7 +35,7 @@ class DesktopPigeonApp:
         bounds = work_area(root.winfo_screenwidth(), root.winfo_screenheight())
         self.nest_position = bounds.clamp(bounds.x + bounds.width - 112,
                                          bounds.y + bounds.height - 100)
-        self.pigeon = Pigeon(bounds, self.nest_position, hunger)
+        self.pigeon = Pigeon(bounds, self.nest_position, hunger, companion=self.nest.companion)
         self.rng = random.Random()
         self.paused = False
         self.closed = False
@@ -49,6 +50,8 @@ class DesktopPigeonApp:
         self.nest_overlay.place(*self.nest_position)
         self.shiny_overlay = Overlay(tk.Toplevel(root), 40)
         self.nest_window = NestWindow(self)
+        self.game_window = MinigameWindow(self)
+        self.activity_status = ""
         self.menu = tk.Menu(root, tearoff=False)
         self.menu.add_command(label="Open nest", command=self.nest_window.show)
         foods = tk.Menu(self.menu, tearoff=False)
@@ -57,6 +60,8 @@ class DesktopPigeonApp:
                               command=lambda food=food: self.feed(food))
         self.menu.add_cascade(label="Feed", menu=foods)
         self.menu.add_command(label="Offer a shiny", command=self.offer_shiny)
+        self.menu.add_command(label="Pet pigeon", command=self.pet)
+        self.menu.add_command(label="Play Shiny Sorting", command=self.game_window.show)
         self.pause_index = self.menu.index("end") + 1
         self.menu.add_command(label="Pause", command=self.toggle_pause)
         self.menu.add_separator()
@@ -78,7 +83,30 @@ class DesktopPigeonApp:
             self.menu.grab_release()
 
     def feed(self, food: str) -> None:
+        if not self.nest.companion.feed(food, self.pigeon.hunger):
+            self.activity_status = "No portions left. Play Shiny Sorting to earn food."
+            self.render()
+            return
         self.pigeon.feed(food)
+        self.activity_status = "Coo! Thank you for the food."
+        self.save()
+        self.render()
+
+    def pet(self) -> None:
+        if self.paused:
+            self.activity_status = "Resume to spend time with your pigeon."
+        elif self.nest.companion.pet():
+            self.activity_status = "A gentle head scratch! Friendship increased."
+            self.save()
+        else:
+            self.activity_status = "Give your pigeon a moment before another head scratch."
+        self.render()
+
+    def reward_game(self, score: int) -> None:
+        self.nest.companion.reward_game(score)
+        self.activity_status = f"Sorting complete: +{score} friendship, +2 sunflower portions"
+        if score == 5:
+            self.activity_status += ", +1 golden corn!"
         self.save()
         self.render()
 
@@ -86,7 +114,8 @@ class DesktopPigeonApp:
         pigeon = self.pigeon
         target = make_treasure(pigeon.bounds, pigeon.x, pigeon.y, self.rng)
         if pigeon.investigate(target):
-            self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL
+            curiosity = self.nest.companion.traits["curiosity"] / 100
+            self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL * (1.5 - curiosity)
         self.render()
 
     def toggle_pause(self) -> None:
@@ -101,6 +130,11 @@ class DesktopPigeonApp:
         collected = self.pigeon.step(seconds)
         if collected is not None:
             self.nest.collect(collected)
+            self.save()
+        gift = self.nest.companion.advance(seconds, self.rng)
+        if gift is not None:
+            self.nest.collect(Treasure(gift, "Gift", "#e6ad24", *self.nest_position))
+            self.activity_status = f"Your pigeon brought you a gift: {gift}!"
             self.save()
         if self.elapsed >= self.next_forage and self.pigeon.treasure is None:
             self.offer_shiny()
@@ -128,6 +162,7 @@ class DesktopPigeonApp:
         else:
             self.shiny_overlay.hide()
         self.nest_window.refresh()
+        self.game_window.refresh()
 
     def save(self) -> bool:
         if not self.saving_enabled:

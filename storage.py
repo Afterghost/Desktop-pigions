@@ -10,6 +10,7 @@ import tempfile
 
 from config import HUNGER_MAX, MAX_STORED_ITEMS, NEST_DATA_FILE
 from desktop import TREASURES
+from companion import Companion, GIFTS
 from nest import Item, Nest
 
 
@@ -38,7 +39,7 @@ class Store:
             if len(raw) > 1_000_000:
                 raise ValueError("Save is too large")
             data = json.loads(raw)
-            if data["version"] != 1:
+            if type(data["version"]) is not int or data["version"] not in (1, 2):
                 raise ValueError("Unsupported save version")
             hunger = data["hunger"]
             if (type(hunger) not in (int, float) or not math.isfinite(hunger)
@@ -49,6 +50,8 @@ class Store:
                 raise ValueError("Invalid nest")
             items = []
             names = {(name, kind) for name, kind, _ in TREASURES}
+            if data["version"] == 2:
+                names.update((name, "Gift") for name in GIFTS)
             ids = set()
             for entry in entries:
                 item = Item(**entry)
@@ -58,7 +61,8 @@ class Store:
                     raise ValueError("Invalid item")
                 ids.add(item.id)
                 items.append(item)
-            return float(hunger), Nest(items)
+            profile = Companion.from_data(data["companion"]) if data["version"] == 2 else Companion()
+            return float(hunger), Nest(items, profile)
         except FileNotFoundError:
             return 25.0, Nest()
         except (OSError, ValueError, KeyError, TypeError, OverflowError, RecursionError) as exc:
@@ -72,7 +76,8 @@ class Store:
                                              dir=self.directory, prefix=".nest-",
                                              suffix=".tmp", delete=False) as handle:
                 temporary = Path(handle.name)
-                json.dump({"version": 1, "hunger": hunger,
+                json.dump({"version": 2, "hunger": hunger,
+                           "companion": asdict(nest.companion),
                            "items": [asdict(item) for item in nest.items]}, handle,
                           allow_nan=False, indent=2)
                 handle.flush()
