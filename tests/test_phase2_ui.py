@@ -81,6 +81,7 @@ class Phase2UITests(unittest.TestCase):
     def test_slow_mouse_strokes_pet_at_the_birds_preferred_pace(self):
         bird = self.app.flock.selected
         bird.companion.traits = {"curiosity": 10, "calm": 80, "sociability": 20}
+        bird.companion.pet_preference = "slow"
         self.app.render()
         self.app.nest_window.petting_speed.set("Slow")
         self.assertIn("likes slow petting", self.app.nest_window.personality["text"])

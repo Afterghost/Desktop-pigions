@@ -67,7 +67,7 @@ class NestWindow:
         self.pet_button = ttk.Button(social, text="Pet pigeon", command=app.pet)
         self.pet_button.pack(side="left")
         ttk.Button(social, text="Developer settings",
-                   command=app.developer_settings.show).pack(side="left", padx=5)
+                   command=lambda: app.developer_settings.show()).pack(side="left", padx=5)
         ttk.Button(social, text="Play minigames",
                    command=lambda: app.game_window.show()).pack(side="left", padx=5)
         ttk.Button(social, text="Family stories / activity",

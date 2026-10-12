@@ -81,10 +81,10 @@ class DesktopPigeonApp:
         self.nest_overlay.draw_nest()
         self.nest_overlay.place(*self.nest_position)
         self.shiny_overlay = Overlay(tk.Toplevel(root), 40)
+        self.developer_settings = DeveloperSettings(self)
         self.nest_window = NestWindow(self)
         self.game_window = MinigameWindow(self)
         self.bird_menu = BirdMenu(self)
-        self.developer_settings = DeveloperSettings(self)
         self.activity_status = ""
         self.menu = tk.Menu(root, tearoff=False)
         self.menu.add_command(label="Open nest", command=self.nest_window.show)
