@@ -35,11 +35,25 @@ persistent flock companion described below.
 
 ## Controls and gameplay
 
-- **Left-click a pigeon** to select it and open the nest panel; click the nest to open it.
+- **Left-click a pigeon** to select it and open the nest panel; **double-click** to give it
+  a gentle head scratch; click the nest to open it.
+  Move the mouse back and forth over a pigeon twice to pet it at slow, steady, or quick
+  speed. The nest's mouse-petting setting can filter the recognized pace; each bird's
+  favorite pace follows its dominant personality trait and gives a friendship bonus.
   Feeding, protection, intervention, games, and item returns affect the selected bird.
   The family/history list also selects active birds. Changing birds cancels unfinished games
   and cooperative collections without a reward.
-- **Right-click either** for feeding, nest, pause/resume, or quit.
+- **Right-click a pigeon** for a small action bubble above its head with Feed,
+  Play, and Shoo. Right-click the nest for the general menu, including pause and quit.
+- Open **Developer settings** in the nest to tune flight speed, roaming distance,
+  rest duration, and treasure interval for the current session (these tuning values
+  reset when the app closes). The same panel lets you select double-click and/or
+  mouse-stroke petting and bind a pause/resume key.
+- On Windows, you can optionally enable a brief mouse-pointer prank there: hover
+  over a pigeon for two seconds and it holds a visual pointer. Shake the mouse or
+  press Escape to restore the system pointer and startle the pigeon into a quick
+  flight; a two-second failsafe restores it automatically. Pointer positions are
+  sampled locally and never saved or sent anywhere.
 - **Offer a shiny** starts a collection immediately. The pigeon also finds one
   automatically after about six seconds, then every 21–39 seconds depending on
   curiosity, when available.

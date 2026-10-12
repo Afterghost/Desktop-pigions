@@ -144,6 +144,7 @@ class MigrationTests(unittest.TestCase):
         old_profile = asdict(Companion(friendship=42, games_won=8,
                                       traits={"curiosity": 28, "calm": 79, "sociability": 52}))
         old_profile.pop("progression")
+        old_profile.pop("pet_preference")
         for version in (1, 2):
             data = {"version": version, "hunger": 93.5, "items": [item]}
             if version == 2:
@@ -163,7 +164,7 @@ class MigrationTests(unittest.TestCase):
             nest.companion.progression.intervention_cooldown = 7.5
             nest.companion.progression.forage_cooldown = 210
             self.store.save(hunger, nest)
-            self.assertEqual(json.loads(self.store.path.read_text())["version"], 5)
+            self.assertEqual(json.loads(self.store.path.read_text())["version"], 6)
             self.assertEqual((hunger, nest), self.store.load())
             nest.companion.evolve("care")
             self.store.save(hunger, nest)
@@ -187,7 +188,7 @@ class MigrationTests(unittest.TestCase):
             with self.subTest(key=key, value=value), self.assertRaises(SaveError):
                 self.store.load()
             self.assertEqual(raw, self.store.path.read_text())
-        for version in (False, 6, "3"):
+        for version in (False, 7, "3"):
             base["version"] = version
             raw = json.dumps(base)
             self.store.path.write_text(raw)

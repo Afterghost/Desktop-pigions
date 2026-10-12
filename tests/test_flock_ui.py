@@ -83,6 +83,54 @@ class FlockUITests(unittest.TestCase):
         before = nest.flock.records[0].lifetime
         self.assertEqual(self.store.load()[1].flock.records[0].lifetime, before)
 
+    def test_double_click_pets_bird_and_traits_change_its_appearance(self):
+        app = self.app
+        parent, child = self.grow()
+        parent.companion.traits = {"curiosity": 90, "calm": 5, "sociability": 5}
+        child.companion.traits = {"curiosity": 5, "calm": 5, "sociability": 90}
+        app.render()
+
+        def feather_colors(bird_id):
+            canvas = app.birds[bird_id].canvas
+            return [canvas.itemcget(item, "fill") for item in canvas.find_all()
+                    if canvas.type(item) == "oval"]
+
+        self.assertNotEqual(feather_colors(parent.id), feather_colors(child.id))
+        child_canvas = app.birds[child.id].canvas
+        child_canvas.event_generate("<Double-Button-1>", x=20, y=20)
+        self.root.update()
+        self.assertEqual(app.flock.selected_id, child.id)
+        self.assertGreater(child.companion.friendship, 0)
+        self.assertIn("head scratch", app.activity_status)
+
+    def test_right_click_opens_head_bubble_with_feed_play_and_shoo(self):
+        app = self.app
+        parent, child = self.grow()
+        app.birds[child.id].canvas.event_generate("<Button-3>", x=40, y=35)
+        self.root.update()
+        self.assertEqual(app.flock.selected_id, child.id)
+        self.assertEqual(app.bird_menu.window.state(), "normal")
+        self.assertEqual(app.bird_menu.food_menu.index("end"), 4)
+        self.assertEqual(app.bird_menu.feed_button["text"], "Feed")
+        self.assertEqual(app.bird_menu.play_button["text"], "Play")
+        self.assertEqual(app.bird_menu.shoo_button["text"], "Shoo")
+        self.assertLess(app.bird_menu.window.winfo_rooty(),
+                        app.birds[child.id].window.winfo_rooty())
+
+        child_pigeon = app.pigeons[child.id]
+        child_pigeon.hunger = 80
+        app.bird_menu.food_menu.invoke(0)
+        self.assertEqual(child_pigeon.hunger, 65)
+        self.assertEqual(app.bird_menu.window.state(), "withdrawn")
+
+        app.bird_menu.play_button.invoke()
+        self.assertEqual(app.game_window.window.state(), "normal")
+        app.game_window.cancel()
+        child_pigeon.investigate(Treasure("Blue marble", "Treasure", "#abc",
+                                          child_pigeon.x, child_pigeon.y))
+        app.bird_menu.shoo_button.invoke()
+        self.assertIsNone(child_pigeon.treasure)
+
     def test_departure_grace_pause_return_history_and_stale_callbacks(self):
         app = self.app
         record = app.flock.selected

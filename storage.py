@@ -51,7 +51,7 @@ class Store:
                     result[key] = value
                 return result
             data = json.loads(raw, object_pairs_hook=unique_object)
-            if type(data["version"]) is not int or data["version"] not in (1, 2, 3, 4, 5):
+            if type(data["version"]) is not int or data["version"] not in (1, 2, 3, 4, 5, 6):
                 raise ValueError("Unsupported save version")
             expected = {"version", "hunger", "items"} | ({"companion"} if data["version"] >= 2 else set())
             if data["version"] >= 4:
@@ -83,15 +83,20 @@ class Store:
                 profile_data = data["companion"]
                 if data["version"] == 2:
                     if (not isinstance(profile_data, dict)
-                            or set(profile_data) != set(Companion.__dataclass_fields__) - {"progression"}):
+                            or set(profile_data) != set(Companion.__dataclass_fields__)
+                            - {"progression", "pet_preference"}):
                         raise ValueError("Invalid legacy companion")
-                    profile_data = dict(profile_data, progression=asdict(Progression()))
+                    profile_data = dict(profile_data, progression=asdict(Progression()),
+                                         pet_preference=None)
                 elif data["version"] == 3:
                     legacy_progression = profile_data["progression"]
                     if (type(legacy_progression) is not dict
                             or set(legacy_progression) != set(Progression.__dataclass_fields__) - {"grace"}):
                         raise ValueError("Invalid legacy progression")
-                    profile_data = dict(profile_data, progression=dict(legacy_progression, grace=0))
+                    profile_data = dict(profile_data, progression=dict(legacy_progression, grace=0),
+                                         pet_preference=None)
+                elif data["version"] < 6:
+                    profile_data = dict(profile_data, pet_preference=None)
                 profile = Companion.from_data(profile_data)
             else:
                 profile = Companion(traits=dict.fromkeys(("curiosity", "calm", "sociability"), 50))
@@ -106,6 +111,12 @@ class Store:
                     origins += [asdict(Event("egg_origins", [e["id"]], e["traits"]))
                                 for e in flock_data["eggs"]]
                     flock_data = dict(flock_data, bonds=[], chronicle={"core": origins, "recent": []})
+                if data["version"] < 6:
+                    flock_data = dict(
+                        flock_data,
+                        records=[dict(bird, companion=dict(bird["companion"], pet_preference=None))
+                                 for bird in flock_data["records"]],
+                    )
                 flock = Flock.from_data(flock_data)
             else:
                 flock = Flock.initial(profile, float(hunger))
@@ -156,7 +167,7 @@ class Store:
                                              dir=self.directory, prefix=".nest-",
                                              suffix=".tmp", delete=False) as handle:
                 temporary = Path(handle.name)
-                json.dump({"version": 5, "hunger": hunger,
+                json.dump({"version": 6, "hunger": hunger,
                            "companion": asdict(nest.companion),
                            "flock": asdict(nest.flock),
                            "items": [asdict(item) for item in nest.items]}, handle,

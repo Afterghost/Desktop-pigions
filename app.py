@@ -8,6 +8,7 @@ from tkinter import messagebox
 from config import (
     AUTO_FORAGE_INTERVAL, FOOD_TYPES, MOVEMENT_UPDATE_INTERVAL, PIGEON_SIZE, SAVE_INTERVAL,
 )
+from companion import PettingGesture
 from desktop import Treasure, make_treasure, work_area
 from nest import Nest
 from pigeon import Behavior, Pigeon
@@ -15,8 +16,11 @@ from storage import SaveError, Store
 from flock import Flock, LIFETIME_LIMIT, HISTORY_LIMIT
 from progression import number
 from social import SocialMotion
+from pointer_prank import MouseShake, TemporaryCursorHide
 from ui.nest_window import NestWindow
 from ui.overlay import Overlay
+from ui.bird_menu import BirdMenu
+from ui.developer_settings import DeveloperSettings
 from ui.pigeon_sprite import draw_pigeon
 from ui.minigame_window import MinigameWindow
 
@@ -46,9 +50,25 @@ class DesktopPigeonApp:
         self.pigeons = {}
         self.birds = {}
         self.targets = {}
+        self.pet_gestures = {}
         self.effects = []
         self.social = SocialMotion()
         self.rng = random.Random()
+        self.cursor_hide = TemporaryCursorHide()
+        self.mouse_shake = MouseShake()
+        self.pointer_prank_enabled = False
+        self.pointer_thief = None
+        self.pointer_stolen_at = None
+        self.pointer_hover = None
+        self.pointer_hover_since = None
+        self.last_mouse_vector = (1, 0)
+        self.pointer_theft_cooldown = 0.0
+        self.movement_scale = 1.0
+        self.roam_radius = 200
+        self.rest_scale = 1.0
+        self.treasure_interval = AUTO_FORAGE_INTERVAL
+        self.pause_key = "F8"
+        self._key_capture_callback = None
         self.paused = False
         self.closed = False
         self.elapsed = 0.0
@@ -63,6 +83,8 @@ class DesktopPigeonApp:
         self.shiny_overlay = Overlay(tk.Toplevel(root), 40)
         self.nest_window = NestWindow(self)
         self.game_window = MinigameWindow(self)
+        self.bird_menu = BirdMenu(self)
+        self.developer_settings = DeveloperSettings(self)
         self.activity_status = ""
         self.menu = tk.Menu(root, tearoff=False)
         self.menu.add_command(label="Open nest", command=self.nest_window.show)
@@ -87,6 +109,7 @@ class DesktopPigeonApp:
             self._add_bird(record, self.bird if index == 0 else None,
                            self.shiny_overlay if index == 0 else None)
         self._link_selection()
+        root.bind_all("<KeyPress>", self._handle_keypress, add="+")
         root.bind("<Escape>", lambda event: self.close()
                   if event.widget.winfo_toplevel() == root else None)
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -101,6 +124,99 @@ class DesktopPigeonApp:
         finally:
             self.menu.grab_release()
 
+    def capture_next_key(self, callback):
+        self._key_capture_callback = callback
+
+    def set_pointer_prank(self):
+        self.pointer_prank_enabled = (
+            self.cursor_hide.supported and self.developer_settings.pointer_prank.get())
+        if not self.pointer_prank_enabled:
+            self._restore_pointer()
+
+    def _restore_pointer(self, startled=False):
+        if self.pointer_thief is None:
+            return
+        bird_id = self.pointer_thief
+        self.cursor_hide.show()
+        self.pointer_thief = None
+        self.pointer_stolen_at = None
+        self.mouse_shake.reset()
+        pigeon = self.pigeons.get(bird_id)
+        if startled and pigeon is not None:
+            pigeon.startle(*self.last_mouse_vector)
+
+    def _check_pointer_prank(self, now):
+        if self.pointer_thief is not None:
+            try:
+                x, y = self.root.winfo_pointerxy()
+            except tk.TclError:
+                self._restore_pointer()
+                return
+            motion = self.mouse_shake.move(x, y, now)
+            if motion is not None:
+                self.last_mouse_vector = motion
+                self._restore_pointer(startled=True)
+            elif now - self.pointer_stolen_at >= 2:
+                self._restore_pointer()
+            return
+
+        if not self.pointer_prank_enabled or self.paused or now < self.pointer_theft_cooldown:
+            self.pointer_hover = None
+            self.pointer_hover_since = None
+            return
+        try:
+            x, y = self.root.winfo_pointerxy()
+        except tk.TclError:
+            return
+        bird_id = next((identity for identity, pigeon in self.pigeons.items()
+                        if pigeon.x <= x < pigeon.x + PIGEON_SIZE
+                        and pigeon.y <= y < pigeon.y + PIGEON_SIZE), None)
+        if bird_id != self.pointer_hover:
+            self.pointer_hover = bird_id
+            self.pointer_hover_since = now if bird_id is not None else None
+        if (bird_id is not None and self.pointer_hover_since is not None
+                and now - self.pointer_hover_since >= 2):
+            if self.cursor_hide.hide():
+                self.pointer_thief = bird_id
+                self.pointer_stolen_at = now
+                self.mouse_shake.reset()
+                self.mouse_shake.move(x, y, now)
+                self.pointer_hover = None
+                self.pointer_hover_since = None
+                self.pointer_theft_cooldown = now + 30
+
+    def _handle_keypress(self, event):
+        if event.keysym == "Escape" and self.pointer_thief is not None:
+            self._restore_pointer()
+            return "break"
+        if self._key_capture_callback is not None:
+            callback, self._key_capture_callback = self._key_capture_callback, None
+            callback(event.keysym)
+            return "break"
+        if event.keysym.casefold() == self.pause_key.casefold():
+            self.toggle_pause()
+            return "break"
+
+    def apply_developer_settings(self, speed, roam, rest, treasure_interval):
+        self.movement_scale = max(0.5, min(3.0, float(speed)))
+        self.roam_radius = max(50, min(600, int(float(roam))))
+        self.rest_scale = max(0.25, min(2.0, float(rest)))
+        self.treasure_interval = max(5, min(120, int(float(treasure_interval))))
+        for pigeon in self.pigeons.values():
+            pigeon.movement_scale = self.movement_scale
+            pigeon.roam_radius = self.roam_radius
+            pigeon.rest_scale = self.rest_scale
+        self.next_forage = (
+            self.elapsed + self.treasure_interval
+            * (1.5 - self.nest.companion.traits["curiosity"] / 100))
+        for record in self.flock.active:
+            pigeon = self.pigeons.get(record.id)
+            if pigeon is None:
+                continue
+            record.forage_timer = min(
+                record.forage_timer,
+                self.treasure_interval * (1.5 - record.companion.traits["curiosity"] / 100))
+
     @property
     def has_bird(self):
         return self.flock.selected_id in self.pigeons
@@ -108,6 +224,9 @@ class DesktopPigeonApp:
     def _add_bird(self, record, overlay=None, target=None):
         pigeon = Pigeon(self.bounds, self.nest_position, record.hunger,
                         companion=record.companion)
+        pigeon.movement_scale = self.movement_scale
+        pigeon.roam_radius = self.roam_radius
+        pigeon.rest_scale = self.rest_scale
         pigeon.x, pigeon.y = self.bounds.clamp(pigeon.x + len(self.pigeons) * 100, pigeon.y)
         self.pigeons[record.id] = pigeon
         overlay = overlay or Overlay(tk.Toplevel(self.root), PIGEON_SIZE)
@@ -115,8 +234,39 @@ class DesktopPigeonApp:
         self.birds[record.id] = overlay
         self.targets[record.id] = target
         overlay.canvas.bind("<Button-1>", lambda event, bird_id=record.id: self.select_bird(bird_id, True))
-        overlay.canvas.bind("<Button-3>", lambda event, bird_id=record.id: (
-            self.select_bird(bird_id), self._popup(event)))
+        overlay.canvas.bind("<Double-Button-1>", lambda event, bird_id=record.id: self._pet_bird(bird_id))
+        overlay.canvas.bind("<Motion>", lambda event, bird_id=record.id: self._pet_motion(bird_id, event))
+        overlay.canvas.bind("<Leave>", lambda event, bird_id=record.id: self.pet_gestures[bird_id].reset())
+        overlay.canvas.bind("<Button-3>", lambda event, bird_id=record.id:
+                            self._bird_popup(bird_id))
+        self.pet_gestures[record.id] = PettingGesture()
+
+    def _bird_popup(self, bird_id):
+        if not self.select_bird(bird_id):
+            return
+        overlay = self.birds[bird_id]
+        self.bird_menu.show(overlay.window.winfo_rootx(), overlay.window.winfo_rooty(), self.bounds)
+
+    def _pet_bird(self, bird_id):
+        if (self.developer_settings.gesture.get() != "Mouse strokes"
+                and self.select_bird(bird_id, True)):
+            self.pet()
+
+    def _pet_motion(self, bird_id, event):
+        if self.closed or self.paused or bird_id not in self.pet_gestures:
+            return
+        if self.developer_settings.gesture.get() == "Double-click":
+            return
+        speed = self.pet_gestures[bird_id].move(event.x, time.monotonic())
+        if speed is None:
+            return
+        selected_speed = self.nest_window.petting_speed.get().lower()
+        if selected_speed not in ("any speed", speed):
+            self.activity_status = f"Choose {speed.title()} or Any speed in Settings to use that stroke."
+            self.render()
+            return
+        if self.select_bird(bird_id, True):
+            self.pet(speed)
 
     def _link_selection(self):
         record = self.flock.selected or self.flock.records[0]
@@ -179,6 +329,8 @@ class DesktopPigeonApp:
         self.render()
 
     def _depart(self, record):
+        if self.pointer_thief == record.id:
+            self._restore_pointer()
         task = self.social.collaboration
         if task and record.id in (task.leader, task.partner):
             self.social.cancel(self.pigeons)
@@ -223,14 +375,19 @@ class DesktopPigeonApp:
         self.save()
         self.render()
 
-    def pet(self) -> None:
+    def pet(self, speed=None) -> None:
         if self.closed or not self.has_bird:
             return
         if self.paused:
             self.activity_status = "Resume to spend time with your pigeon."
-        elif self.nest.companion.pet():
+        elif self.nest.companion.pet(speed):
             self.flock.milestone(self.flock.selected_id, "care")
-            self.activity_status = "A gentle head scratch! Friendship increased."
+            if speed and speed == self.nest.companion.pet_speed_preference:
+                self.activity_status = f"Perfect {speed} strokes! Your pigeon loves that pace."
+            elif speed:
+                self.activity_status = f"A {speed} head scratch! Friendship increased."
+            else:
+                self.activity_status = "A gentle head scratch! Friendship increased."
             self.save()
         else:
             self.activity_status = "Give your pigeon a moment before another head scratch."
@@ -261,7 +418,7 @@ class DesktopPigeonApp:
         target = make_treasure(pigeon.bounds, pigeon.x, pigeon.y, self.rng)
         if pigeon.investigate(target):
             curiosity = self.nest.companion.traits["curiosity"] / 100
-            self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL * (1.5 - curiosity)
+            self.next_forage = self.elapsed + self.treasure_interval * (1.5 - curiosity)
         self.render()
 
     def intervene(self, action: str) -> bool:
@@ -285,7 +442,7 @@ class DesktopPigeonApp:
         self.pigeon.cancel_theft()
         progress.intervention_cooldown = 10
         profile.evolve("govern")
-        self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL
+        self.next_forage = self.elapsed + self.treasure_interval
         self.activity_status = f"{action}: cancelled the synthetic target. Nothing collected."
         self.save()
         self.render()
@@ -307,7 +464,7 @@ class DesktopPigeonApp:
                 self.social.cancel(self.pigeons)
             if self.pigeon.treasure is not None and self.pigeon.treasure.kind == kind:
                 self.pigeon.cancel_theft()
-        self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL
+        self.next_forage = self.elapsed + self.treasure_interval
         self.save()
         self.render()
 
@@ -323,6 +480,7 @@ class DesktopPigeonApp:
     def toggle_pause(self) -> None:
         if self.closed:
             return
+        self._restore_pointer()
         self.last_tick = time.monotonic()
         self.paused = not self.paused
         self.menu.entryconfigure(self.pause_index, label="Resume" if self.paused else "Pause")
@@ -373,7 +531,7 @@ class DesktopPigeonApp:
                 if record.forage_timer == 0:
                     pigeon.investigate(make_treasure(pigeon.bounds, pigeon.x, pigeon.y, self.rng))
                     curiosity = record.companion.traits["curiosity"] / 100
-                    record.forage_timer = AUTO_FORAGE_INTERVAL * (1.5 - curiosity)
+                    record.forage_timer = self.treasure_interval * (1.5 - curiosity)
         for record, collected, task in deliveries:
             if record.status != "active":
                 continue
@@ -411,7 +569,7 @@ class DesktopPigeonApp:
                 effect.window.destroy()
                 self.effects.remove((effect, expiry))
         if self.has_bird and self.elapsed >= self.next_forage and self.pigeon.treasure is None:
-            self.next_forage = self.elapsed + AUTO_FORAGE_INTERVAL
+            self.next_forage = self.elapsed + self.treasure_interval
             self.offer_shiny()
         if self.elapsed >= self.next_save:
             self.save()
@@ -424,6 +582,7 @@ class DesktopPigeonApp:
         # Sleep/suspension does not cause starvation or teleportation on resume.
         self.advance(min(0.25, max(0, now - self.last_tick)))
         self.last_tick = now
+        self._check_pointer_prank(now)
         self.render()
         self.tick_id = self.root.after(MOVEMENT_UPDATE_INTERVAL, self._tick)
 
@@ -432,7 +591,8 @@ class DesktopPigeonApp:
             return
         for bird_id, pigeon in self.pigeons.items():
             overlay = self.birds[bird_id]
-            draw_pigeon(overlay.canvas, pigeon, self.elapsed, self.paused)
+            draw_pigeon(overlay.canvas, pigeon, self.elapsed, self.paused,
+                        holding_pointer=bird_id == self.pointer_thief)
             label = self.social.labels.get(bird_id)
             if label:
                 overlay.canvas.create_text(PIGEON_SIZE // 2, 12, text=label,
@@ -465,6 +625,7 @@ class DesktopPigeonApp:
     def close(self) -> None:
         if self.closed:
             return
+        self._restore_pointer()
         if self.saving_enabled and not self.save():
             if not messagebox.askyesno("Local save failed",
                                       "Quit without saving the latest changes?",

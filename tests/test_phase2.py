@@ -1,15 +1,17 @@
 from dataclasses import asdict
+import ctypes
 import json
 from pathlib import Path
 import random
 import tempfile
 import unittest
 
-from companion import Companion, GIFTS
+from companion import Companion, GIFTS, PettingGesture
 from desktop import Bounds, Treasure
 from minigames import ShinySorting
 from nest import Nest
 from pigeon import Behavior, Pigeon
+from pointer_prank import MouseShake, TemporaryCursorHide
 from storage import SaveError, Store
 
 
@@ -44,6 +46,30 @@ class CompanionTests(unittest.TestCase):
         self.assertEqual(self.profile.gift_timer, 0)
         self.assertIsNone(self.profile.advance(1, random.Random(1)))
 
+    def test_pet_speed_preference_and_matching_bonus(self):
+        self.assertEqual(self.profile.pet_speed_preference, "quick")
+        self.assertTrue(self.profile.pet("quick"))
+        self.assertEqual(self.profile.friendship, 5)
+        self.assertFalse(self.profile.pet("slow"))
+        calm = Companion(traits={"curiosity": 10, "calm": 80, "sociability": 20})
+        social = Companion(traits={"curiosity": 10, "calm": 20, "sociability": 80})
+        self.assertEqual(calm.pet_speed_preference, "slow")
+        self.assertEqual(social.pet_speed_preference, "steady")
+        calm.evolve("play")
+        calm.evolve("play")
+        self.assertEqual(calm.pet_speed_preference, "slow")
+        with self.assertRaises(ValueError):
+            social.pet("too fast")
+
+    def test_mouse_gesture_recognizes_two_strokes_at_their_pace(self):
+        gesture = PettingGesture()
+        samples = ((10, 0), (40, .2), (70, .4), (40, .6), (10, .8), (40, 1))
+        result = None
+        for x, now in samples:
+            result = gesture.move(x, now)
+        self.assertEqual(result, "steady")
+        self.assertIsNone(gesture.move(10, 1.2))
+
     def test_personality_influences_roaming_pause(self):
         self.assertEqual(self.profile.personality, "Shiny explorer")
         waits = []
@@ -56,6 +82,64 @@ class CompanionTests(unittest.TestCase):
             pigeon.step(0.1)
             waits.append(pigeon.wait)
         self.assertGreater(waits[1], waits[0])
+
+    def test_developer_movement_scale_changes_flight_speed(self):
+        normal, fast = (
+            Pigeon(Bounds(0, 0, 800, 600), (600, 400)),
+            Pigeon(Bounds(0, 0, 800, 600), (600, 400)),
+        )
+        for bird in (normal, fast):
+            bird.behavior = Behavior.ROAMING
+            bird.destination = (700, 300)
+        fast.movement_scale = 2
+        normal.step(0.033)
+        fast.step(0.033)
+        self.assertAlmostEqual(fast.x - 400, (normal.x - 400) * 2)
+
+    def test_mouse_shake_detects_reversals_within_time_window(self):
+        shake = MouseShake()
+        results = []
+        for x, now in ((0, 0), (60, .1), (0, .2), (60, .3), (0, .4)):
+            results.append(shake.move(x, 0, now))
+        self.assertIn((60, 0), results)
+
+        shake.reset()
+        results = []
+        for x, now in ((0, 0), (60, .1), (0, .2), (60, 2), (0, 2.1)):
+            results.append(shake.move(x, 0, now))
+        self.assertTrue(all(result is None for result in results))
+
+    def test_temporary_cursor_hiding_restores_its_own_show_calls(self):
+        class User32:
+            visible = True
+
+            def GetCursorInfo(self, pointer):
+                pointer._obj.flags = int(self.visible)
+                return 1
+
+            def ShowCursor(self, show):
+                self.visible = bool(show)
+                return int(self.visible)
+
+        cursor = TemporaryCursorHide()
+        cursor._ctypes = ctypes
+        cursor._user32 = User32()
+        self.assertTrue(cursor.hide())
+        self.assertFalse(cursor._user32.visible)
+        cursor.show()
+        self.assertTrue(cursor._user32.visible)
+        self.assertEqual(cursor._hide_calls, 0)
+
+    def test_startled_pigeon_bursts_away_and_resumes_roaming(self):
+        pigeon = Pigeon(Bounds(0, 0, 800, 600), (600, 400))
+        start = pigeon.x
+        pigeon.startle(60, 0)
+        self.assertTrue(pigeon.startled)
+        self.assertEqual(pigeon.destination[0], start - 120)
+        pigeon.step(1)
+        self.assertFalse(pigeon.startled)
+        self.assertEqual(pigeon.behavior, Behavior.IDLE)
+        self.assertLess(pigeon.x, start)
 
     def test_game_reward_is_once_and_requires_winning_score(self):
         for correct_count in range(6):
@@ -100,7 +184,7 @@ class Phase2StorageTests(unittest.TestCase):
         nest.companion.befriend(25)
         nest.collect(Treasure(GIFTS[0], "Gift", "#e6ad24", 0, 0))
         self.store.save(hunger, nest)
-        self.assertEqual(json.loads(self.store.path.read_text())["version"], 5)
+        self.assertEqual(json.loads(self.store.path.read_text())["version"], 6)
         self.assertEqual(self.store.load(), (hunger, nest))
 
     def test_invalid_phase2_data_is_preserved(self):
