@@ -23,6 +23,16 @@ Linux: install your distribution’s Tkinter package (e.g. `python3-tk`) and use
 backgrounds; other platforms use small opaque tiles as a preview fallback.
 Windows is the intended desktop target; multi-monitor roaming is not implemented.
 
+## Separate session-local interaction prototype
+
+Run `python interaction_app.py` (or `py interaction_app.py` on Windows) for the
+alternative drag-food/feather and cosmetic paper-tear prototype. Add `--preview`
+for a normal window; non-Windows platforms use that preview automatically.
+Drag treats from the edge tray, or use **Smooth it out** to clear temporary tears.
+This alternative keeps everything in memory, resets on exit, and does not read,
+write, or share the flock app's saves. The default `py main.py` remains the
+persistent flock companion described below.
+
 ## Controls and gameplay
 
 - **Left-click a pigeon** to select it and open the nest panel; click the nest to open it.
