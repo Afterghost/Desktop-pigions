@@ -90,3 +90,27 @@ class Phase2UITests(unittest.TestCase):
                 self.app._pet_motion(bird.id, SimpleNamespace(x=x))
         self.assertEqual(bird.companion.friendship, 4)
         self.assertIn("Perfect slow strokes", self.app.activity_status)
+
+    def test_developer_settings_apply_and_keybinding_capture(self):
+        settings = self.app.developer_settings
+        settings.speed.set(2.0)
+        settings.roam.set(350)
+        settings.rest.set(0.5)
+        settings.treasure_interval.set(12)
+        settings._apply()
+        pigeon = self.app.pigeon
+        self.assertEqual((pigeon.movement_scale, pigeon.roam_radius, pigeon.rest_scale),
+                         (2.0, 350, 0.5))
+        self.assertEqual(self.app.treasure_interval, 12)
+
+        settings._capture_key()
+        self.app._handle_keypress(SimpleNamespace(keysym="F9"))
+        self.assertEqual(self.app.pause_key, "F9")
+        self.app._handle_keypress(SimpleNamespace(keysym="F9"))
+        self.assertTrue(self.app.paused)
+        self.app._handle_keypress(SimpleNamespace(keysym="F9"))
+        self.assertFalse(self.app.paused)
+
+        settings.gesture.set("Double-click")
+        self.app.pet_gestures[self.app.flock.selected_id].reset()
+        self.assertEqual(settings.gesture.get(), "Double-click")

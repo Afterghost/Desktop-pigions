@@ -81,6 +81,19 @@ class CompanionTests(unittest.TestCase):
             waits.append(pigeon.wait)
         self.assertGreater(waits[1], waits[0])
 
+    def test_developer_movement_scale_changes_flight_speed(self):
+        normal, fast = (
+            Pigeon(Bounds(0, 0, 800, 600), (600, 400)),
+            Pigeon(Bounds(0, 0, 800, 600), (600, 400)),
+        )
+        for bird in (normal, fast):
+            bird.behavior = Behavior.ROAMING
+            bird.destination = (700, 300)
+        fast.movement_scale = 2
+        normal.step(0.033)
+        fast.step(0.033)
+        self.assertAlmostEqual(fast.x - 400, (normal.x - 400) * 2)
+
     def test_game_reward_is_once_and_requires_winning_score(self):
         for correct_count in range(6):
             game = ShinySorting(random.Random(2))

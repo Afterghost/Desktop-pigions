@@ -6,7 +6,7 @@ import random
 
 from config import (
     BASE_MOVEMENT_SPEED, IDLE_DURATION_MAX, IDLE_DURATION_MIN,
-    MOVEMENT_UPDATE_INTERVAL, THEFT_ANIMATION_DURATION,
+    MOVEMENT_UPDATE_INTERVAL, ROAM_RADIUS, THEFT_ANIMATION_DURATION,
     THEFT_APPROACH_SPEED, THEFT_ESCAPE_SPEED,
 )
 from desktop import Bounds, Treasure
@@ -41,6 +41,9 @@ class Pigeon:
         self.facing_right = True
         self.fed_for = 0.0
         self.companion = companion
+        self.movement_scale = 1.0
+        self.roam_radius = ROAM_RADIUS
+        self.rest_scale = 1.0
 
     @property
     def hunger_label(self) -> str:
@@ -75,7 +78,7 @@ class Pigeon:
     def _move(self, seconds: float, speed: float) -> bool:
         dx, dy = self.destination[0] - self.x, self.destination[1] - self.y
         distance = math.hypot(dx, dy)
-        step = speed * seconds * 1000 / MOVEMENT_UPDATE_INTERVAL
+        step = speed * self.movement_scale * seconds * 1000 / MOVEMENT_UPDATE_INTERVAL
         if dx:
             self.facing_right = dx > 0
         if distance <= step:
@@ -99,7 +102,9 @@ class Pigeon:
             if self.wait > 0:
                 return None
             if self.behavior == Behavior.IDLE:
-                self.destination = self.bounds.nearby(self.x, self.y, self.rng)
+                self.destination = self.bounds.clamp(
+                    self.x + self.rng.uniform(-self.roam_radius, self.roam_radius),
+                    self.y + self.rng.uniform(-self.roam_radius, self.roam_radius))
                 self.behavior = Behavior.ROAMING
             elif self.behavior == Behavior.INVESTIGATING:
                 self.destination = self.bounds.clamp(self.treasure.x, self.treasure.y)
@@ -117,7 +122,8 @@ class Pigeon:
             if self._move(seconds, BASE_MOVEMENT_SPEED):
                 self.behavior = Behavior.IDLE
                 calm = self.companion.traits["calm"] / 100 if self.companion else 0.5
-                self.wait = self.rng.uniform(IDLE_DURATION_MIN, IDLE_DURATION_MAX) / 1000 * (0.5 + calm)
+                self.wait = (self.rng.uniform(IDLE_DURATION_MIN, IDLE_DURATION_MAX) / 1000
+                             * (0.5 + calm) * self.rest_scale)
         elif self.behavior == Behavior.APPROACHING:
             if self._move(seconds, THEFT_APPROACH_SPEED):
                 self.behavior = Behavior.THEFT

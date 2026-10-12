@@ -45,6 +45,10 @@ persistent flock companion described below.
   and cooperative collections without a reward.
 - **Right-click a pigeon** for a small action bubble above its head with Feed,
   Play, and Shoo. Right-click the nest for the general menu, including pause and quit.
+- Open **Developer settings** in the nest to tune flight speed, roaming distance,
+  rest duration, and treasure interval for the current session (these tuning values
+  reset when the app closes). The same panel lets you select double-click and/or
+  mouse-stroke petting and bind a pause/resume key.
 - **Offer a shiny** starts a collection immediately. The pigeon also finds one
   automatically after about six seconds, then every 21–39 seconds depending on
   curiosity, when available.
