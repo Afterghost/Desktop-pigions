@@ -18,6 +18,7 @@ from progression import number
 from social import SocialMotion
 from ui.nest_window import NestWindow
 from ui.overlay import Overlay
+from ui.bird_menu import BirdMenu
 from ui.pigeon_sprite import draw_pigeon
 from ui.minigame_window import MinigameWindow
 
@@ -65,6 +66,7 @@ class DesktopPigeonApp:
         self.shiny_overlay = Overlay(tk.Toplevel(root), 40)
         self.nest_window = NestWindow(self)
         self.game_window = MinigameWindow(self)
+        self.bird_menu = BirdMenu(self)
         self.activity_status = ""
         self.menu = tk.Menu(root, tearoff=False)
         self.menu.add_command(label="Open nest", command=self.nest_window.show)
@@ -120,9 +122,15 @@ class DesktopPigeonApp:
         overlay.canvas.bind("<Double-Button-1>", lambda event, bird_id=record.id: self._pet_bird(bird_id))
         overlay.canvas.bind("<Motion>", lambda event, bird_id=record.id: self._pet_motion(bird_id, event))
         overlay.canvas.bind("<Leave>", lambda event, bird_id=record.id: self.pet_gestures[bird_id].reset())
-        overlay.canvas.bind("<Button-3>", lambda event, bird_id=record.id: (
-            self.select_bird(bird_id), self._popup(event)))
+        overlay.canvas.bind("<Button-3>", lambda event, bird_id=record.id:
+                            self._bird_popup(bird_id))
         self.pet_gestures[record.id] = PettingGesture()
+
+    def _bird_popup(self, bird_id):
+        if not self.select_bird(bird_id):
+            return
+        overlay = self.birds[bird_id]
+        self.bird_menu.show(overlay.window.winfo_rootx(), overlay.window.winfo_rooty(), self.bounds)
 
     def _pet_bird(self, bird_id):
         if self.select_bird(bird_id, True):

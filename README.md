@@ -43,7 +43,8 @@ persistent flock companion described below.
   Feeding, protection, intervention, games, and item returns affect the selected bird.
   The family/history list also selects active birds. Changing birds cancels unfinished games
   and cooperative collections without a reward.
-- **Right-click either** for feeding, nest, pause/resume, or quit.
+- **Right-click a pigeon** for a small action bubble above its head with Feed,
+  Play, and Shoo. Right-click the nest for the general menu, including pause and quit.
 - **Offer a shiny** starts a collection immediately. The pigeon also finds one
   automatically after about six seconds, then every 21–39 seconds depending on
   curiosity, when available.
