@@ -115,8 +115,13 @@ class DesktopPigeonApp:
         self.birds[record.id] = overlay
         self.targets[record.id] = target
         overlay.canvas.bind("<Button-1>", lambda event, bird_id=record.id: self.select_bird(bird_id, True))
+        overlay.canvas.bind("<Double-Button-1>", lambda event, bird_id=record.id: self._pet_bird(bird_id))
         overlay.canvas.bind("<Button-3>", lambda event, bird_id=record.id: (
             self.select_bird(bird_id), self._popup(event)))
+
+    def _pet_bird(self, bird_id):
+        if self.select_bird(bird_id, True):
+            self.pet()
 
     def _link_selection(self):
         record = self.flock.selected or self.flock.records[0]

@@ -6,8 +6,30 @@ import tkinter as tk
 from pigeon import Behavior, Pigeon
 
 
+def _trait_color(pigeon: Pigeon, palette: dict[str, str], fallback: str) -> str:
+    traits = pigeon.companion.traits if pigeon.companion else {}
+    total = sum(traits.values())
+    if not total:
+        return fallback
+    channels = [
+        round(sum(int(palette[name][index:index + 2], 16) * value
+                  for name, value in traits.items()) / total)
+        for index in (1, 3, 5)
+    ]
+    return "#" + "".join(f"{channel:02x}" for channel in channels)
+
+
 def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool) -> None:
     canvas.delete("all")
+    body_color = _trait_color(
+        pigeon, {"curiosity": "#aab4c4", "calm": "#a7b6ae", "sociability": "#b6a6b3"},
+        "#a7b3c2")
+    wing_color = _trait_color(
+        pigeon, {"curiosity": "#75889e", "calm": "#71897f", "sociability": "#907783"},
+        "#75889e")
+    head_color = _trait_color(
+        pigeon, {"curiosity": "#718499", "calm": "#698e84", "sociability": "#947986"},
+        "#718499")
     walking = pigeon.behavior in (Behavior.ROAMING, Behavior.APPROACHING, Behavior.ESCAPING)
     bob = math.sin(phase * 14) * 2 if walking and not paused else 0
     peck = 7 if pigeon.behavior == Behavior.THEFT and int(phase * 5) % 2 else 0
@@ -36,11 +58,11 @@ def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool) -
                            fill="#c86c60", width=3)
     canvas.create_polygon(*points(27, 58, 5, 70, 34, 73),
                           fill="#647488", outline="#3d4b5c")
-    oval(23, 40, 72, 77, fill="#a7b3c2", outline="#526075", width=2)
-    oval(27, 48, 61, 71, fill="#75889e", outline="#526075", width=2)
+    oval(23, 40, 72, 77, fill=body_color, outline="#526075", width=2)
+    oval(27, 48, 61, 71, fill=wing_color, outline="#526075", width=2)
     canvas.create_line(*points(33, 60, 51, 65), fill="#becad6", width=2)
     oval(54, 32 + peck, 76, 60 + peck, fill="#579c91", outline="#3c746d")
-    oval(54, 23 + peck, 82, 47 + peck, fill="#718499", outline="#3d4b5c", width=2)
+    oval(54, 23 + peck, 82, 47 + peck, fill=head_color, outline="#3d4b5c", width=2)
     oval(72, 29 + peck, 77, 34 + peck, fill="#111921", outline="white")
     canvas.create_polygon(*points(80, 35 + peck, 93, 39 + peck, 80, 42 + peck),
                           fill="#dcad71", outline="#8a6842")

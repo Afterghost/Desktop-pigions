@@ -83,6 +83,26 @@ class FlockUITests(unittest.TestCase):
         before = nest.flock.records[0].lifetime
         self.assertEqual(self.store.load()[1].flock.records[0].lifetime, before)
 
+    def test_double_click_pets_bird_and_traits_change_its_appearance(self):
+        app = self.app
+        parent, child = self.grow()
+        parent.companion.traits = {"curiosity": 90, "calm": 5, "sociability": 5}
+        child.companion.traits = {"curiosity": 5, "calm": 5, "sociability": 90}
+        app.render()
+
+        def feather_colors(bird_id):
+            canvas = app.birds[bird_id].canvas
+            return [canvas.itemcget(item, "fill") for item in canvas.find_all()
+                    if canvas.type(item) == "oval"]
+
+        self.assertNotEqual(feather_colors(parent.id), feather_colors(child.id))
+        child_canvas = app.birds[child.id].canvas
+        child_canvas.event_generate("<Double-Button-1>", x=20, y=20)
+        self.root.update()
+        self.assertEqual(app.flock.selected_id, child.id)
+        self.assertGreater(child.companion.friendship, 0)
+        self.assertIn("head scratch", app.activity_status)
+
     def test_departure_grace_pause_return_history_and_stale_callbacks(self):
         app = self.app
         record = app.flock.selected

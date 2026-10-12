@@ -35,7 +35,8 @@ persistent flock companion described below.
 
 ## Controls and gameplay
 
-- **Left-click a pigeon** to select it and open the nest panel; click the nest to open it.
+- **Left-click a pigeon** to select it and open the nest panel; **double-click** to give it
+  a gentle head scratch; click the nest to open it.
   Feeding, protection, intervention, games, and item returns affect the selected bird.
   The family/history list also selects active birds. Changing birds cancels unfinished games
   and cooperative collections without a reward.
