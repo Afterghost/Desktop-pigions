@@ -8,6 +8,7 @@ from tkinter import messagebox
 from config import (
     AUTO_FORAGE_INTERVAL, FOOD_TYPES, MOVEMENT_UPDATE_INTERVAL, PIGEON_SIZE, SAVE_INTERVAL,
 )
+from companion import PettingGesture
 from desktop import Treasure, make_treasure, work_area
 from nest import Nest
 from pigeon import Behavior, Pigeon
@@ -46,6 +47,7 @@ class DesktopPigeonApp:
         self.pigeons = {}
         self.birds = {}
         self.targets = {}
+        self.pet_gestures = {}
         self.effects = []
         self.social = SocialMotion()
         self.rng = random.Random()
@@ -116,12 +118,29 @@ class DesktopPigeonApp:
         self.targets[record.id] = target
         overlay.canvas.bind("<Button-1>", lambda event, bird_id=record.id: self.select_bird(bird_id, True))
         overlay.canvas.bind("<Double-Button-1>", lambda event, bird_id=record.id: self._pet_bird(bird_id))
+        overlay.canvas.bind("<Motion>", lambda event, bird_id=record.id: self._pet_motion(bird_id, event))
+        overlay.canvas.bind("<Leave>", lambda event, bird_id=record.id: self.pet_gestures[bird_id].reset())
         overlay.canvas.bind("<Button-3>", lambda event, bird_id=record.id: (
             self.select_bird(bird_id), self._popup(event)))
+        self.pet_gestures[record.id] = PettingGesture()
 
     def _pet_bird(self, bird_id):
         if self.select_bird(bird_id, True):
             self.pet()
+
+    def _pet_motion(self, bird_id, event):
+        if self.closed or self.paused or bird_id not in self.pet_gestures:
+            return
+        speed = self.pet_gestures[bird_id].move(event.x, time.monotonic())
+        if speed is None:
+            return
+        selected_speed = self.nest_window.petting_speed.get().lower()
+        if selected_speed not in ("any speed", speed):
+            self.activity_status = f"Choose {speed.title()} or Any speed in Settings to use that stroke."
+            self.render()
+            return
+        if self.select_bird(bird_id, True):
+            self.pet(speed)
 
     def _link_selection(self):
         record = self.flock.selected or self.flock.records[0]
@@ -228,14 +247,19 @@ class DesktopPigeonApp:
         self.save()
         self.render()
 
-    def pet(self) -> None:
+    def pet(self, speed=None) -> None:
         if self.closed or not self.has_bird:
             return
         if self.paused:
             self.activity_status = "Resume to spend time with your pigeon."
-        elif self.nest.companion.pet():
+        elif self.nest.companion.pet(speed):
             self.flock.milestone(self.flock.selected_id, "care")
-            self.activity_status = "A gentle head scratch! Friendship increased."
+            if speed and speed == self.nest.companion.pet_speed_preference:
+                self.activity_status = f"Perfect {speed} strokes! Your pigeon loves that pace."
+            elif speed:
+                self.activity_status = f"A {speed} head scratch! Friendship increased."
+            else:
+                self.activity_status = "A gentle head scratch! Friendship increased."
             self.save()
         else:
             self.activity_status = "Give your pigeon a moment before another head scratch."

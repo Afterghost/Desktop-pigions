@@ -74,6 +74,15 @@ class NestWindow:
         self.bonds.pack(anchor="w")
         self.activity = ttk.Label(frame, wraplength=540)
         self.activity.pack(anchor="w", pady=3)
+        settings = ttk.LabelFrame(frame, text="Settings — mouse petting", padding=4)
+        settings.pack(fill="x")
+        ttk.Label(settings, text="Recognize stroke pace:").pack(side="left")
+        self.petting_speed = tk.StringVar(value="Any speed")
+        ttk.Combobox(settings, textvariable=self.petting_speed,
+                     values=("Any speed", "Slow", "Steady", "Quick"),
+                     state="readonly", width=12).pack(side="left", padx=5)
+        ttk.Label(settings, text="Move back and forth over the pigeon twice; match their favorite pace for bonus friendship."
+                  ).pack(side="left")
         governance = ttk.LabelFrame(frame, text="Visible synthetic targets only", padding=4)
         governance.pack(fill="x")
         self.intervention_buttons = {}
@@ -151,7 +160,8 @@ class NestWindow:
         profile = app.nest.companion
         self.relationship.configure(text=f"Friendship: {profile.friendship}/100 — {profile.relationship}")
         self.friendship["value"] = profile.friendship
-        self.personality.configure(text=f"Personality: {profile.personality}")
+        self.personality.configure(text=f"Personality: {profile.personality} · "
+                                        f"likes {profile.pet_speed_preference} petting")
         progress = profile.progression
         self.progress.configure(text=f"Reputation: {progress.reputation} — {progress.title}\n"
                                 f"Trust: {progress.neglect_stage}"

@@ -11,6 +11,7 @@ from progression import Progression
 GIFTS = ("Soft feather", "Lucky coin", "Tiny glass pebble", "Ribbon bouquet",
          "Polished bottle cap", "Friendship twig")
 TRAITS = ("curiosity", "calm", "sociability")
+PETTING_SPEEDS = ("slow", "steady", "quick")
 
 
 @dataclass
@@ -53,6 +54,11 @@ class Companion:
                 "sociability": "Sociable companion"}[dominant]
                 + (" · Forgiven" if self.progression.forgiven else ""))
 
+    @property
+    def pet_speed_preference(self) -> str:
+        dominant = max(TRAITS, key=lambda name: self.traits[name])
+        return {"calm": "slow", "sociability": "steady", "curiosity": "quick"}[dominant]
+
     def evolve(self, action):
         self.progression.record(action)
         trait = {"care": "calm", "collect": "curiosity", "play": "sociability",
@@ -75,10 +81,16 @@ class Companion:
             self.evolve("care")
         return True
 
-    def pet(self) -> bool:
+    def pet(self, speed: str | None = None) -> bool:
         if self.pet_cooldown > 0:
             return False
-        self.befriend(2 + self.traits["sociability"] // 40)
+        points = 2 + self.traits["sociability"] // 40
+        if speed is not None:
+            if speed not in PETTING_SPEEDS:
+                raise ValueError("Unknown petting speed")
+            if speed == self.pet_speed_preference:
+                points += 2
+        self.befriend(points)
         self.pet_cooldown = 15
         self.evolve("care")
         return True
@@ -123,3 +135,45 @@ class Companion:
                     or not 0 <= value <= maximum):
                 raise ValueError("Invalid companion timer")
         return profile
+
+
+class PettingGesture:
+    """Recognize two consecutive horizontal mouse strokes and their pace."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.last_x = None
+        self.last_time = None
+        self.direction = 0
+        self.segment_x = None
+        self.segment_time = None
+        self.speeds = []
+
+    def move(self, x: float, now: float) -> str | None:
+        if (self.last_x is None or now <= self.last_time or now - self.last_time > 2.5):
+            self.reset()
+            self.last_x, self.last_time = x, now
+            return None
+
+        delta = x - self.last_x
+        direction = (delta > 0) - (delta < 0)
+        if direction and self.direction and direction != self.direction:
+            distance = abs(self.last_x - self.segment_x)
+            duration = self.last_time - self.segment_time
+            if distance >= 24 and duration > 0:
+                speed = distance / duration
+                pace = "slow" if speed < 140 else "steady" if speed < 500 else "quick"
+                self.speeds.append(pace)
+                self.speeds = self.speeds[-2:]
+                if len(self.speeds) == 2 and self.speeds[0] == self.speeds[1]:
+                    self.reset()
+                    return pace
+            self.segment_x, self.segment_time = self.last_x, self.last_time
+        elif direction and not self.direction:
+            self.segment_x, self.segment_time = self.last_x, self.last_time
+        if direction:
+            self.direction = direction
+        self.last_x, self.last_time = x, now
+        return None

@@ -37,6 +37,9 @@ persistent flock companion described below.
 
 - **Left-click a pigeon** to select it and open the nest panel; **double-click** to give it
   a gentle head scratch; click the nest to open it.
+  Move the mouse back and forth over a pigeon twice to pet it at slow, steady, or quick
+  speed. The nest's mouse-petting setting can filter the recognized pace; each bird's
+  favorite pace follows its dominant personality trait and gives a friendship bonus.
   Feeding, protection, intervention, games, and item returns affect the selected bird.
   The family/history list also selects active birds. Changing birds cancels unfinished games
   and cooperative collections without a reward.
