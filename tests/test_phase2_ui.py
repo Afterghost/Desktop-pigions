@@ -3,6 +3,8 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 try:
     import tkinter as tk
@@ -75,3 +77,16 @@ class Phase2UITests(unittest.TestCase):
         self.assertEqual(self.app.pigeon.hunger, hunger)
         self.assertEqual(self.app.nest.companion.friendship, 0)
         self.assertIn("No portions", self.app.nest_window.activity["text"])
+
+    def test_slow_mouse_strokes_pet_at_the_birds_preferred_pace(self):
+        bird = self.app.flock.selected
+        bird.companion.traits = {"curiosity": 10, "calm": 80, "sociability": 20}
+        self.app.render()
+        self.app.nest_window.petting_speed.set("Slow")
+        self.assertIn("likes slow petting", self.app.nest_window.personality["text"])
+        times = (0, .3, .6, .9, 1.2, 1.5)
+        with patch("app.time.monotonic", side_effect=times):
+            for x in (10, 40, 70, 40, 10, 40):
+                self.app._pet_motion(bird.id, SimpleNamespace(x=x))
+        self.assertEqual(bird.companion.friendship, 4)
+        self.assertIn("Perfect slow strokes", self.app.activity_status)

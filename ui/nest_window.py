@@ -76,13 +76,13 @@ class NestWindow:
         self.activity.pack(anchor="w", pady=3)
         settings = ttk.LabelFrame(frame, text="Settings — mouse petting", padding=4)
         settings.pack(fill="x")
-        ttk.Label(settings, text="Recognize stroke pace:").pack(side="left")
+        ttk.Label(settings, text="Recognize stroke pace:").grid(row=0, column=0, sticky="w")
         self.petting_speed = tk.StringVar(value="Any speed")
         ttk.Combobox(settings, textvariable=self.petting_speed,
                      values=("Any speed", "Slow", "Steady", "Quick"),
-                     state="readonly", width=12).pack(side="left", padx=5)
-        ttk.Label(settings, text="Move back and forth over the pigeon twice; match their favorite pace for bonus friendship."
-                  ).pack(side="left")
+                     state="readonly", width=12).grid(row=0, column=1, padx=5, sticky="w")
+        ttk.Label(settings, text="Move back and forth over the pigeon twice; match their favorite pace for bonus friendship.",
+                  wraplength=560).grid(row=1, column=0, columnspan=2, sticky="w")
         governance = ttk.LabelFrame(frame, text="Visible synthetic targets only", padding=4)
         governance.pack(fill="x")
         self.intervention_buttons = {}

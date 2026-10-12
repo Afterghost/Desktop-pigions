@@ -25,6 +25,13 @@ class Companion:
     gift_timer: float = 0
     games_won: int = 0
     progression: Progression = field(default_factory=Progression)
+    pet_preference: str | None = None
+
+    def __post_init__(self):
+        if self.pet_preference is None:
+            dominant = max(TRAITS, key=lambda name: self.traits[name])
+            self.pet_preference = {"calm": "slow", "sociability": "steady",
+                                   "curiosity": "quick"}[dominant]
 
     @property
     def relationship(self) -> str:
@@ -56,8 +63,7 @@ class Companion:
 
     @property
     def pet_speed_preference(self) -> str:
-        dominant = max(TRAITS, key=lambda name: self.traits[name])
-        return {"calm": "slow", "sociability": "steady", "curiosity": "quick"}[dominant]
+        return self.pet_preference
 
     def evolve(self, action):
         self.progression.record(action)
@@ -134,6 +140,8 @@ class Companion:
             if (type(value) not in (int, float) or not math.isfinite(value)
                     or not 0 <= value <= maximum):
                 raise ValueError("Invalid companion timer")
+        if profile.pet_preference not in PETTING_SPEEDS:
+            raise ValueError("Invalid petting preference")
         return profile
 
 

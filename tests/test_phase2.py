@@ -53,6 +53,9 @@ class CompanionTests(unittest.TestCase):
         social = Companion(traits={"curiosity": 10, "calm": 20, "sociability": 80})
         self.assertEqual(calm.pet_speed_preference, "slow")
         self.assertEqual(social.pet_speed_preference, "steady")
+        calm.evolve("play")
+        calm.evolve("play")
+        self.assertEqual(calm.pet_speed_preference, "slow")
         with self.assertRaises(ValueError):
             social.pet("too fast")
 
@@ -121,7 +124,7 @@ class Phase2StorageTests(unittest.TestCase):
         nest.companion.befriend(25)
         nest.collect(Treasure(GIFTS[0], "Gift", "#e6ad24", 0, 0))
         self.store.save(hunger, nest)
-        self.assertEqual(json.loads(self.store.path.read_text())["version"], 5)
+        self.assertEqual(json.loads(self.store.path.read_text())["version"], 6)
         self.assertEqual(self.store.load(), (hunger, nest))
 
     def test_invalid_phase2_data_is_preserved(self):

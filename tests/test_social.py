@@ -185,10 +185,15 @@ class StoryStorageTests(unittest.TestCase):
         data["version"] = 4
         data["flock"].pop("bonds")
         data["flock"].pop("chronicle")
+        data["companion"].pop("pet_preference")
+        for bird in data["flock"]["records"]:
+            bird["companion"].pop("pet_preference")
         raw = json.dumps(data)
         self.store.path.write_text(raw)
         hunger, migrated = self.store.load()
         self.assertEqual(self.store.path.read_text(), raw)
+        for restored, original in zip(migrated.flock.records, flock.records):
+            original.companion.pet_preference = restored.companion.pet_preference
         self.assertEqual(migrated.flock.records, flock.records)
         self.assertEqual(migrated.flock.eggs, flock.eggs)
         self.assertEqual({e.kind for e in migrated.flock.chronicle.core}, {"origins", "egg_origins"})

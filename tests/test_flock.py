@@ -111,6 +111,7 @@ class FlockStorageTests(unittest.TestCase):
                     legacy.pop("progression")
                 else:
                     legacy["progression"].pop("grace")
+                legacy.pop("pet_preference")
                 data["companion"] = legacy
             raw = json.dumps(data)
             self.store.path.write_text(raw)
@@ -123,8 +124,28 @@ class FlockStorageTests(unittest.TestCase):
                 self.assertEqual(nest.companion.friendship, 47)
                 self.assertEqual(nest.companion.traits, profile["traits"])
             self.store.save(hunger, nest)
-            self.assertEqual(json.loads(self.store.path.read_text())["version"], 5)
+            self.assertEqual(json.loads(self.store.path.read_text())["version"], 6)
             self.assertEqual(self.store.load(), (hunger, nest))
+
+    def test_v5_save_migrates_to_stable_pet_speed_preferences(self):
+        nest = Nest()
+        nest.companion.traits = {"curiosity": 10, "calm": 80, "sociability": 20}
+        self.store.save(25, nest)
+        data = json.loads(self.store.path.read_text())
+        data["version"] = 5
+        data["companion"].pop("pet_preference")
+        for bird in data["flock"]["records"]:
+            bird["companion"].pop("pet_preference")
+        raw = json.dumps(data)
+        self.store.path.write_text(raw)
+
+        _, migrated = self.store.load()
+
+        self.assertEqual(self.store.path.read_text(), raw)
+        self.assertEqual(migrated.companion.pet_speed_preference, "slow")
+        migrated.companion.traits["calm"] = 10
+        migrated.companion.traits["curiosity"] = 100
+        self.assertEqual(migrated.companion.pet_speed_preference, "slow")
 
     def test_corrupt_flock_fields_and_references_disable_saving(self):
         nest = Nest()
