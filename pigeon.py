@@ -44,6 +44,7 @@ class Pigeon:
         self.movement_scale = 1.0
         self.roam_radius = ROAM_RADIUS
         self.rest_scale = 1.0
+        self.startled = False
 
     @property
     def hunger_label(self) -> str:
@@ -75,6 +76,16 @@ class Pigeon:
         self.wait = 2
         return True
 
+    def startle(self, mouse_dx: float, mouse_dy: float) -> None:
+        self.startled = True
+        self.behavior = Behavior.ROAMING
+        self.destination = self.bounds.clamp(
+            self.x - mouse_dx * 2, self.y - mouse_dy * 2)
+        if math.hypot(self.destination[0] - self.x, self.destination[1] - self.y) < 24:
+            direction = -1 if self.facing_right else 1
+            self.destination = self.bounds.clamp(
+                self.x + direction * self.roam_radius, self.y - self.roam_radius / 2)
+
     def _move(self, seconds: float, speed: float) -> bool:
         dx, dy = self.destination[0] - self.x, self.destination[1] - self.y
         distance = math.hypot(dx, dy)
@@ -94,6 +105,12 @@ class Pigeon:
             raise ValueError("Elapsed time must be finite and non-negative")
         self.hunger = advance_hunger(self.hunger, seconds)
         self.fed_for = max(0, self.fed_for - seconds)
+        if self.startled:
+            if self._move(seconds, BASE_MOVEMENT_SPEED * 4):
+                self.startled = False
+                self.behavior = Behavior.IDLE
+                self.wait = 0.3
+            return None
         if social_movement and self.treasure is None:
             return None
         if self.behavior in (Behavior.IDLE, Behavior.INVESTIGATING,

@@ -49,6 +49,11 @@ persistent flock companion described below.
   rest duration, and treasure interval for the current session (these tuning values
   reset when the app closes). The same panel lets you select double-click and/or
   mouse-stroke petting and bind a pause/resume key.
+- On Windows, you can optionally enable a brief mouse-pointer prank there: hover
+  over a pigeon for two seconds and it holds a visual pointer. Shake the mouse or
+  press Escape to restore the system pointer and startle the pigeon into a quick
+  flight; a two-second failsafe restores it automatically. Pointer positions are
+  sampled locally and never saved or sent anywhere.
 - **Offer a shiny** starts a collection immediately. The pigeon also finds one
   automatically after about six seconds, then every 21–39 seconds depending on
   curiosity, when available.

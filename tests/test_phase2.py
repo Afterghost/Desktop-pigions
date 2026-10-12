@@ -1,4 +1,5 @@
 from dataclasses import asdict
+import ctypes
 import json
 from pathlib import Path
 import random
@@ -10,6 +11,7 @@ from desktop import Bounds, Treasure
 from minigames import ShinySorting
 from nest import Nest
 from pigeon import Behavior, Pigeon
+from pointer_prank import MouseShake, TemporaryCursorHide
 from storage import SaveError, Store
 
 
@@ -93,6 +95,51 @@ class CompanionTests(unittest.TestCase):
         normal.step(0.033)
         fast.step(0.033)
         self.assertAlmostEqual(fast.x - 400, (normal.x - 400) * 2)
+
+    def test_mouse_shake_detects_reversals_within_time_window(self):
+        shake = MouseShake()
+        results = []
+        for x, now in ((0, 0), (60, .1), (0, .2), (60, .3), (0, .4)):
+            results.append(shake.move(x, 0, now))
+        self.assertIn((60, 0), results)
+
+        shake.reset()
+        results = []
+        for x, now in ((0, 0), (60, .1), (0, .2), (60, 2), (0, 2.1)):
+            results.append(shake.move(x, 0, now))
+        self.assertTrue(all(result is None for result in results))
+
+    def test_temporary_cursor_hiding_restores_its_own_show_calls(self):
+        class User32:
+            visible = True
+
+            def GetCursorInfo(self, pointer):
+                pointer._obj.flags = int(self.visible)
+                return 1
+
+            def ShowCursor(self, show):
+                self.visible = bool(show)
+                return int(self.visible)
+
+        cursor = TemporaryCursorHide()
+        cursor._ctypes = ctypes
+        cursor._user32 = User32()
+        self.assertTrue(cursor.hide())
+        self.assertFalse(cursor._user32.visible)
+        cursor.show()
+        self.assertTrue(cursor._user32.visible)
+        self.assertEqual(cursor._hide_calls, 0)
+
+    def test_startled_pigeon_bursts_away_and_resumes_roaming(self):
+        pigeon = Pigeon(Bounds(0, 0, 800, 600), (600, 400))
+        start = pigeon.x
+        pigeon.startle(60, 0)
+        self.assertTrue(pigeon.startled)
+        self.assertEqual(pigeon.destination[0], start - 120)
+        pigeon.step(1)
+        self.assertFalse(pigeon.startled)
+        self.assertEqual(pigeon.behavior, Behavior.IDLE)
+        self.assertLess(pigeon.x, start)
 
     def test_game_reward_is_once_and_requires_winning_score(self):
         for correct_count in range(6):

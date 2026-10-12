@@ -114,3 +114,31 @@ class Phase2UITests(unittest.TestCase):
         settings.gesture.set("Double-click")
         self.app.pet_gestures[self.app.flock.selected_id].reset()
         self.assertEqual(settings.gesture.get(), "Double-click")
+
+    def test_pointer_prank_shake_restores_cursor_and_startles_thief(self):
+        app = self.app
+        pigeon = app.pigeon
+        app.pointer_thief = app.flock.selected_id
+        app.pointer_stolen_at = 10
+        app.last_mouse_vector = (-50, 10)
+        app.cursor_hide.show = lambda: setattr(app, "cursor_restored", True)
+        app.cursor_restored = False
+        app._restore_pointer(startled=True)
+
+        self.assertTrue(app.cursor_restored)
+        self.assertIsNone(app.pointer_thief)
+        self.assertTrue(pigeon.startled)
+        self.assertEqual(pigeon.destination[0], pigeon.x + 100)
+
+    def test_pointer_prank_has_automatic_restore_timeout(self):
+        app = self.app
+        app.pointer_thief = app.flock.selected_id
+        app.pointer_stolen_at = 10
+        app.cursor_hide.show = lambda: setattr(app, "cursor_restored", True)
+        app.cursor_restored = False
+        with patch.object(app.root, "winfo_pointerxy", return_value=(0, 0)):
+            app._check_pointer_prank(12.1)
+
+        self.assertTrue(app.cursor_restored)
+        self.assertIsNone(app.pointer_thief)
+        self.assertFalse(app.pigeon.startled)

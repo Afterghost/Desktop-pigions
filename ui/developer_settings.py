@@ -44,6 +44,15 @@ class DeveloperSettings:
         self.key_button.grid(row=6, column=1, sticky="w")
         ttk.Label(frame, text="Click the key button, then press the key to bind.",
                   wraplength=340).grid(row=7, column=0, columnspan=2, sticky="w")
+        self.pointer_prank = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            frame, text="Allow brief mouse-pointer theft (Windows only)",
+            variable=self.pointer_prank, command=self.app.set_pointer_prank,
+            state="normal" if self.app.cursor_hide.supported else "disabled",
+        ).grid(row=8, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ttk.Label(frame, text="Hover over a pigeon for 2 seconds. Shake to restore the pointer; "
+                  "it also returns automatically after 2 seconds.",
+                  wraplength=340).grid(row=9, column=0, columnspan=2, sticky="w")
         frame.columnconfigure(1, weight=1)
 
     def _apply(self, *_):

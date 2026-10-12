@@ -16,6 +16,7 @@ from storage import SaveError, Store
 from flock import Flock, LIFETIME_LIMIT, HISTORY_LIMIT
 from progression import number
 from social import SocialMotion
+from pointer_prank import MouseShake, TemporaryCursorHide
 from ui.nest_window import NestWindow
 from ui.overlay import Overlay
 from ui.bird_menu import BirdMenu
@@ -53,6 +54,15 @@ class DesktopPigeonApp:
         self.effects = []
         self.social = SocialMotion()
         self.rng = random.Random()
+        self.cursor_hide = TemporaryCursorHide()
+        self.mouse_shake = MouseShake()
+        self.pointer_prank_enabled = False
+        self.pointer_thief = None
+        self.pointer_stolen_at = None
+        self.pointer_hover = None
+        self.pointer_hover_since = None
+        self.last_mouse_vector = (1, 0)
+        self.pointer_theft_cooldown = 0.0
         self.movement_scale = 1.0
         self.roam_radius = 200
         self.rest_scale = 1.0
@@ -117,7 +127,68 @@ class DesktopPigeonApp:
     def capture_next_key(self, callback):
         self._key_capture_callback = callback
 
+    def set_pointer_prank(self):
+        self.pointer_prank_enabled = (
+            self.cursor_hide.supported and self.developer_settings.pointer_prank.get())
+        if not self.pointer_prank_enabled:
+            self._restore_pointer()
+
+    def _restore_pointer(self, startled=False):
+        if self.pointer_thief is None:
+            return
+        bird_id = self.pointer_thief
+        self.cursor_hide.show()
+        self.pointer_thief = None
+        self.pointer_stolen_at = None
+        self.mouse_shake.reset()
+        pigeon = self.pigeons.get(bird_id)
+        if startled and pigeon is not None:
+            pigeon.startle(*self.last_mouse_vector)
+
+    def _check_pointer_prank(self, now):
+        if self.pointer_thief is not None:
+            try:
+                x, y = self.root.winfo_pointerxy()
+            except tk.TclError:
+                self._restore_pointer()
+                return
+            motion = self.mouse_shake.move(x, y, now)
+            if motion is not None:
+                self.last_mouse_vector = motion
+                self._restore_pointer(startled=True)
+            elif now - self.pointer_stolen_at >= 2:
+                self._restore_pointer()
+            return
+
+        if not self.pointer_prank_enabled or self.paused or now < self.pointer_theft_cooldown:
+            self.pointer_hover = None
+            self.pointer_hover_since = None
+            return
+        try:
+            x, y = self.root.winfo_pointerxy()
+        except tk.TclError:
+            return
+        bird_id = next((identity for identity, pigeon in self.pigeons.items()
+                        if pigeon.x <= x < pigeon.x + PIGEON_SIZE
+                        and pigeon.y <= y < pigeon.y + PIGEON_SIZE), None)
+        if bird_id != self.pointer_hover:
+            self.pointer_hover = bird_id
+            self.pointer_hover_since = now if bird_id is not None else None
+        if (bird_id is not None and self.pointer_hover_since is not None
+                and now - self.pointer_hover_since >= 2):
+            if self.cursor_hide.hide():
+                self.pointer_thief = bird_id
+                self.pointer_stolen_at = now
+                self.mouse_shake.reset()
+                self.mouse_shake.move(x, y, now)
+                self.pointer_hover = None
+                self.pointer_hover_since = None
+                self.pointer_theft_cooldown = now + 30
+
     def _handle_keypress(self, event):
+        if event.keysym == "Escape" and self.pointer_thief is not None:
+            self._restore_pointer()
+            return "break"
         if self._key_capture_callback is not None:
             callback, self._key_capture_callback = self._key_capture_callback, None
             callback(event.keysym)
@@ -258,6 +329,8 @@ class DesktopPigeonApp:
         self.render()
 
     def _depart(self, record):
+        if self.pointer_thief == record.id:
+            self._restore_pointer()
         task = self.social.collaboration
         if task and record.id in (task.leader, task.partner):
             self.social.cancel(self.pigeons)
@@ -407,6 +480,7 @@ class DesktopPigeonApp:
     def toggle_pause(self) -> None:
         if self.closed:
             return
+        self._restore_pointer()
         self.last_tick = time.monotonic()
         self.paused = not self.paused
         self.menu.entryconfigure(self.pause_index, label="Resume" if self.paused else "Pause")
@@ -508,6 +582,7 @@ class DesktopPigeonApp:
         # Sleep/suspension does not cause starvation or teleportation on resume.
         self.advance(min(0.25, max(0, now - self.last_tick)))
         self.last_tick = now
+        self._check_pointer_prank(now)
         self.render()
         self.tick_id = self.root.after(MOVEMENT_UPDATE_INTERVAL, self._tick)
 
@@ -516,7 +591,8 @@ class DesktopPigeonApp:
             return
         for bird_id, pigeon in self.pigeons.items():
             overlay = self.birds[bird_id]
-            draw_pigeon(overlay.canvas, pigeon, self.elapsed, self.paused)
+            draw_pigeon(overlay.canvas, pigeon, self.elapsed, self.paused,
+                        holding_pointer=bird_id == self.pointer_thief)
             label = self.social.labels.get(bird_id)
             if label:
                 overlay.canvas.create_text(PIGEON_SIZE // 2, 12, text=label,
@@ -549,6 +625,7 @@ class DesktopPigeonApp:
     def close(self) -> None:
         if self.closed:
             return
+        self._restore_pointer()
         if self.saving_enabled and not self.save():
             if not messagebox.askyesno("Local save failed",
                                       "Quit without saving the latest changes?",

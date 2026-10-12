@@ -19,7 +19,8 @@ def _trait_color(pigeon: Pigeon, palette: dict[str, str], fallback: str) -> str:
     return "#" + "".join(f"{channel:02x}" for channel in channels)
 
 
-def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool) -> None:
+def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool,
+                holding_pointer: bool = False) -> None:
     canvas.delete("all")
     body_color = _trait_color(
         pigeon, {"curiosity": "#aab4c4", "calm": "#a7b6ae", "sociability": "#b6a6b3"},
@@ -68,6 +69,15 @@ def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool) -
                           fill="#dcad71", outline="#8a6842")
     if pigeon.hunger > 90:
         canvas.create_line(*points(70, 27 + peck, 79, 30 + peck), fill="#27313e", width=2)
+    if pigeon.startled:
+        canvas.create_text(49, 25, text="!", fill="#e26e31",
+                           font=("TkDefaultFont", 16, "bold"))
+        canvas.create_line(*points(30, 45, 20, 32), fill="#becad6", width=4)
+        canvas.create_line(*points(63, 44, 72, 30), fill="#becad6", width=4)
+    if holding_pointer:
+        canvas.create_polygon(*points(38, 32, 38, 51, 43, 46, 47, 55, 51, 53,
+                                     47, 44, 54, 44),
+                              fill="white", outline="#19232d", width=2)
     if pigeon.carrying and pigeon.treasure is not None:
         canvas.create_polygon(*points(88, 43, 95, 50, 88, 57, 81, 50),
                               fill=pigeon.treasure.color, outline="#7c6537")
