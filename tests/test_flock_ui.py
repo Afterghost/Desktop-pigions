@@ -97,7 +97,8 @@ class FlockUITests(unittest.TestCase):
 
         self.assertNotEqual(feather_colors(parent.id), feather_colors(child.id))
         child_canvas = app.birds[child.id].canvas
-        child_canvas.event_generate("<Double-Button-1>", x=20, y=20)
+        child_canvas.event_generate("<Button-1>", x=20, y=20)
+        child_canvas.event_generate("<Button-1>", x=20, y=20)
         self.root.update()
         self.assertEqual(app.flock.selected_id, child.id)
         self.assertGreater(child.companion.friendship, 0)
