@@ -2,7 +2,7 @@ import random
 import unittest
 
 import config
-from pigeon import Pigeon, MAX_ITEMS, MAX_TEARS, TEAR_LIFETIME, EAT_DURATION, PLAY_DURATION
+from interaction_pigeon import Pigeon, MAX_ITEMS, MAX_TEARS, TEAR_LIFETIME, EAT_DURATION, PLAY_DURATION
 
 
 class PigeonTests(unittest.TestCase):

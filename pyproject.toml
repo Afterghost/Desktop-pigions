@@ -1,0 +1,6 @@
+[project]
+name = "desktop-pigeon"
+version = "0.1.0"
+description = "A privacy-first, local-only desktop pigeon companion"
+requires-python = ">=3.10"
+dependencies = []

@@ -1,0 +1,51 @@
+"""Procedural pigeon art, with walking, pecking, carrying, and feeding feedback."""
+
+import math
+import tkinter as tk
+
+from pigeon import Behavior, Pigeon
+
+
+def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool) -> None:
+    canvas.delete("all")
+    walking = pigeon.behavior in (Behavior.ROAMING, Behavior.APPROACHING, Behavior.ESCAPING)
+    bob = math.sin(phase * 14) * 2 if walking and not paused else 0
+    peck = 7 if pigeon.behavior == Behavior.THEFT and int(phase * 5) % 2 else 0
+
+    def points(*coords):
+        result = []
+        for index, value in enumerate(coords):
+            if index % 2 == 0:
+                result.append(value if pigeon.facing_right else 96 - value)
+            else:
+                result.append(value + bob)
+        return result
+
+    def oval(x1, y1, x2, y2, **kwargs):
+        x1, y1, x2, y2 = points(x1, y1, x2, y2)
+        canvas.create_oval(min(x1, x2), y1, max(x1, x2), y2, **kwargs)
+
+    label = "Paused" if paused else f"{pigeon.hunger_label} {pigeon.hunger:.0f}%"
+    if pigeon.fed_for > 0:
+        label = "Coo! Thank you!"
+    canvas.create_text(48, 10, text=label, fill="#9d342c" if pigeon.hunger > 70 else "#344557",
+                       font=("TkDefaultFont", 9, "bold"))
+    stride = math.sin(phase * 14) * 4 if walking and not paused else 0
+    for x, lift in ((40, stride), (57, -stride)):
+        canvas.create_line(*points(x, 70, x + lift, 83, x + lift + 7, 83),
+                           fill="#c86c60", width=3)
+    canvas.create_polygon(*points(27, 58, 5, 70, 34, 73),
+                          fill="#647488", outline="#3d4b5c")
+    oval(23, 40, 72, 77, fill="#a7b3c2", outline="#526075", width=2)
+    oval(27, 48, 61, 71, fill="#75889e", outline="#526075", width=2)
+    canvas.create_line(*points(33, 60, 51, 65), fill="#becad6", width=2)
+    oval(54, 32 + peck, 76, 60 + peck, fill="#579c91", outline="#3c746d")
+    oval(54, 23 + peck, 82, 47 + peck, fill="#718499", outline="#3d4b5c", width=2)
+    oval(72, 29 + peck, 77, 34 + peck, fill="#111921", outline="white")
+    canvas.create_polygon(*points(80, 35 + peck, 93, 39 + peck, 80, 42 + peck),
+                          fill="#dcad71", outline="#8a6842")
+    if pigeon.hunger > 90:
+        canvas.create_line(*points(70, 27 + peck, 79, 30 + peck), fill="#27313e", width=2)
+    if pigeon.carrying and pigeon.treasure is not None:
+        canvas.create_polygon(*points(88, 43, 95, 50, 88, 57, 81, 50),
+                              fill=pigeon.treasure.color, outline="#7c6537")

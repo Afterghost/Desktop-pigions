@@ -5,8 +5,8 @@ import ctypes
 import unittest
 from unittest.mock import Mock, patch
 
-from app import App, WindowsOverlay
-from pigeon import Pigeon, MAX_ITEMS
+from interaction_app import App, WindowsOverlay
+from interaction_pigeon import Pigeon, MAX_ITEMS
 
 
 class InteractionTests(unittest.TestCase):
