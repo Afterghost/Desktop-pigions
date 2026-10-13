@@ -198,6 +198,9 @@ class DesktopPigeonApp:
         if event.keysym == "Escape" and self.pointer_thief is not None:
             self._restore_pointer()
             return "break"
+        if event.keysym == "Escape" and self.game_window.overlay_open:
+            self.game_window.cancel()
+            return "break"
         if event.keysym == "Escape" and self.drag_item is not None:
             self._cancel_drag()
             return "break"
@@ -245,7 +248,8 @@ class DesktopPigeonApp:
         target = target or Overlay(tk.Toplevel(self.root), 40)
         self.birds[record.id] = overlay
         self.targets[record.id] = target
-        overlay.canvas.bind("<Button-1>", lambda event, bird_id=record.id: self.select_bird(bird_id, True))
+        overlay.canvas.bind("<Button-1>",
+                            lambda event, bird_id=record.id: self._bird_click(bird_id, event))
         overlay.canvas.bind("<Double-Button-1>", lambda event, bird_id=record.id: self._pet_bird(bird_id))
         overlay.canvas.bind("<Motion>", lambda event, bird_id=record.id: self._pet_motion(bird_id, event))
         overlay.canvas.bind("<Leave>", lambda event, bird_id=record.id: self.pet_gestures[bird_id].reset())
@@ -258,6 +262,11 @@ class DesktopPigeonApp:
             return
         overlay = self.birds[bird_id]
         self.bird_menu.show(overlay.window.winfo_rootx(), overlay.window.winfo_rooty(), self.bounds)
+
+    def _bird_click(self, bird_id, event):
+        if self.game_window.handle_click(bird_id, event.x, event.y):
+            return "break"
+        self.select_bird(bird_id, True)
 
     def _pet_bird(self, bird_id):
         if (self.developer_settings.gesture.get() != "Mouse strokes"
@@ -485,7 +494,12 @@ class DesktopPigeonApp:
             return False
         self.nest.companion.reward_game(score)
         self.flock.milestone(self.flock.selected_id, "win")
-        self.activity_status = f"Game complete: +{score} friendship, +2 sunflower portions"
+        trinket = make_treasure(self.pigeon.bounds, self.pigeon.x, self.pigeon.y, self.rng)
+        self.nest.collect(trinket, self.nest.companion)
+        self.flock.milestone(self.flock.selected_id, "treasure")
+        self.activity_status = (
+            f"Game complete: +{score} friendship, +2 sunflower portions, "
+            f"and a {trinket.name} trinket!")
         if score == 5:
             self.activity_status += ", +1 golden corn!"
         self.save()
@@ -673,15 +687,30 @@ class DesktopPigeonApp:
             return
         for bird_id, pigeon in self.pigeons.items():
             overlay = self.birds[bird_id]
+            playing = (self.game_window.overlay_open
+                       and self.game_window.participant == bird_id)
+            if playing:
+                width, height, x, y, offset_x, offset_y = (
+                    self.game_window.overlay_layout(pigeon))
+                overlay.canvas.configure(width=width, height=height)
+                overlay.window.geometry(f"{width}x{height}{x:+d}{y:+d}")
+                if overlay.window.state() == "withdrawn":
+                    overlay.window.deiconify()
+            else:
+                overlay.canvas.configure(width=PIGEON_SIZE, height=PIGEON_SIZE)
             draw_pigeon(overlay.canvas, pigeon, self.elapsed, self.paused,
                         holding_pointer=bird_id == self.pointer_thief,
                         paper_tears=self.paper_tears[bird_id],
                         feather_playing=self.play_effects[bird_id] > 0)
+            if playing:
+                overlay.canvas.move("all", offset_x, offset_y)
             label = self.social.labels.get(bird_id)
             if label:
-                overlay.canvas.create_text(PIGEON_SIZE // 2, 12, text=label,
+                overlay.canvas.create_text((offset_x if playing else 0) + PIGEON_SIZE // 2,
+                                           (offset_y if playing else 0) + 12, text=label,
                                            fill="#825019", font=("TkDefaultFont", 8))
-            overlay.place(pigeon.x, pigeon.y)
+            if not playing:
+                overlay.place(pigeon.x, pigeon.y)
             shiny = self.targets[bird_id]
             if pigeon.treasure is not None and not pigeon.carrying:
                 target = pigeon.treasure
@@ -689,6 +718,8 @@ class DesktopPigeonApp:
                 shiny.place(*pigeon.bounds.clamp(target.x + 48, target.y + 48))
             else:
                 shiny.hide()
+        if self.game_window.overlay_open:
+            self.game_window.draw_overlay(self.birds[self.game_window.participant].canvas)
         self.nest_window.refresh()
         self.game_window.refresh()
 

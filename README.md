@@ -98,7 +98,10 @@ separate from the persistent flock app.
   ribbon bouquet, polished bottle cap, or friendship twig
   every two active minutes. These appear as **Gift** entries in the nest and a
   visible notification; they never come from real desktop files.
-- Open **Play minigames** from the nest or pigeon menu and choose a game:
+- Open **Play minigames** from the nest or pigeon menu. The game board expands
+  directly from the selected pigeon overlay (no separate game window); use the
+  on-screen tap/click choices and close it with **×**. The board stays within the
+  usable screen area and keeps the pigeon visible beside the play area. Games:
   - **Shiny Sorting**: sort five items:
   buttons/marbles are Treasures; foil/paper are Fragments. At least three correct
   earns two sunflower-seed portions and friendship equal to the score. A perfect
@@ -114,8 +117,10 @@ separate from the persistent flock app.
     exhausted or resting unnecessarily misses the turn. Attempts have a persisted
     300-active-second cooldown, including cancelled/failed attempts. “Daily” is a
     local gameplay name, not a wall-clock calendar or network event.
-  All games are untimed, five-turn MVPs with on-screen instructions and the same
-  3+ correct reward rule. Pause disables all answers and memory hiding.
+  All games are untimed, five-turn MVPs with on-overlay instructions and the same
+  3+ correct reward rule. Winning earns a generated nest trinket plus two sunflower
+  portions; a perfect score also earns golden corn. Pause disables all answers and
+  memory hiding. Return earned trinkets from the nest inventory to build friendship.
   Closing/Escape/cancelling a game discards the round **without rewards**.
   Unfinished games reset on app exit. The other minigames intentionally use small
   turn-based mechanics rather than real-time arcade simulations.

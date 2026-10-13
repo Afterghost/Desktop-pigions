@@ -46,6 +46,8 @@ class Phase2UITests(unittest.TestCase):
             game_ui.buttons[game_ui.game.current[1]].invoke()
         self.assertEqual(profile.games_won, 1)
         self.assertEqual(profile.food["sunflower_seeds"], 5)
+        self.assertEqual(len(self.app.nest.items), 1)
+        self.assertIn(self.app.nest.items[0].kind, ("Treasure", "Fragment"))
         game_ui.buttons["Treasure"].invoke()
         self.assertEqual(profile.games_won, 1)
         self.assertIn("5/5", game_ui.prompt["text"])
