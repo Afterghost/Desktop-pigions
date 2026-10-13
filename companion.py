@@ -12,13 +12,27 @@ GIFTS = ("Soft feather", "Lucky coin", "Tiny glass pebble", "Ribbon bouquet",
          "Polished bottle cap", "Friendship twig")
 TRAITS = ("curiosity", "calm", "sociability")
 PETTING_SPEEDS = ("slow", "steady", "quick")
-ATTIRE = ("Natural", "Ribbon", "Scarf", "Cap", "Flower")
+STARTER_ATTIRE = ("Natural", "Ribbon", "Scarf", "Cap", "Flower")
 RARE_ATTIRE = (
     "Feather Crown", "Postbird Cap", "Moon Scarf", "Lucky Coin Necklace",
     "Toast Necklace", "Rooftop Jacket", "Pigeon Pin",
 )
-STARTER_ATTIRE = ATTIRE
+ATTIRE = (*STARTER_ATTIRE, *RARE_ATTIRE)
 APPEAL_STYLES = ("Ribbon", "Scarf", "Cap", "Flower")
+ATTIRE_STYLE = {
+    "Natural": None,
+    "Ribbon": "Ribbon",
+    "Scarf": "Scarf",
+    "Cap": "Cap",
+    "Flower": "Flower",
+    "Feather Crown": "Cap",
+    "Postbird Cap": "Cap",
+    "Moon Scarf": "Scarf",
+    "Lucky Coin Necklace": "Ribbon",
+    "Toast Necklace": "Ribbon",
+    "Rooftop Jacket": "Scarf",
+    "Pigeon Pin": "Flower",
+}
 
 
 @dataclass
@@ -168,10 +182,10 @@ class Companion:
                 raise ValueError("Invalid companion timer")
         if profile.pet_preference not in PETTING_SPEEDS:
             raise ValueError("Invalid petting preference")
-        if (profile.outfit not in (*ATTIRE, *RARE_ATTIRE)
+        if (profile.outfit not in ATTIRE
                 or profile.appeal_preference not in APPEAL_STYLES
                 or not isinstance(profile.wardrobe, list)
-                or not all(isinstance(item, str) and item in (*ATTIRE, *RARE_ATTIRE)
+                or not all(isinstance(item, str) and item in ATTIRE
                            for item in profile.wardrobe)
                 or len(profile.wardrobe) != len(set(profile.wardrobe))
                 or not set(STARTER_ATTIRE).issubset(profile.wardrobe)

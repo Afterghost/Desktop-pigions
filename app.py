@@ -8,7 +8,7 @@ from tkinter import messagebox
 from config import (
     AUTO_FORAGE_INTERVAL, FOOD_TYPES, MOVEMENT_UPDATE_INTERVAL, PIGEON_SIZE, SAVE_INTERVAL,
 )
-from companion import ATTIRE, RARE_ATTIRE, PettingGesture
+from companion import ATTIRE, ATTIRE_STYLE, PettingGesture
 from desktop import Treasure, make_treasure, work_area
 from nest import Nest
 from pigeon import Behavior, Pigeon
@@ -320,14 +320,15 @@ class DesktopPigeonApp:
 
     def set_outfit(self, outfit):
         if (self.closed or self.paused or not self.has_bird
-                or outfit not in (*ATTIRE, *RARE_ATTIRE)
+                or outfit not in ATTIRE
                 or outfit not in self.nest.companion.wardrobe):
             return False
         self.nest.companion.outfit = outfit
         preference = self.nest.companion.appeal_preference
+        approved = ATTIRE_STYLE[outfit] == preference
         self.activity_status = (
             f"{self.flock.selected.name} loves the {outfit.lower()} look!"
-            if outfit == preference else
+            if approved else
             f"{self.flock.selected.name} is unsure about the {outfit.lower()} look.")
         self.save()
         self.render()

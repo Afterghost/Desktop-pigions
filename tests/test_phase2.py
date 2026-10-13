@@ -6,7 +6,7 @@ import random
 import tempfile
 import unittest
 
-from companion import Companion, GIFTS, PettingGesture, RARE_ATTIRE
+from companion import ATTIRE_STYLE, Companion, GIFTS, PettingGesture, RARE_ATTIRE
 from desktop import Bounds, Treasure
 from minigames import ShinySorting
 from nest import Nest
@@ -192,6 +192,8 @@ class CompanionTests(unittest.TestCase):
         invalid["wardrobe"].append(found)
         with self.assertRaises(ValueError):
             Companion.from_data(invalid)
+        self.assertEqual(ATTIRE_STYLE["Feather Crown"], "Cap")
+        self.assertEqual(ATTIRE_STYLE["Toast Necklace"], "Ribbon")
         invalid = asdict(profile)
         invalid["wardrobe"].remove(profile.outfit)
         with self.assertRaises(ValueError):

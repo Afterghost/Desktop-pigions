@@ -191,7 +191,7 @@ class MigrationTests(unittest.TestCase):
             with self.subTest(key=key, value=value), self.assertRaises(SaveError):
                 self.store.load()
             self.assertEqual(raw, self.store.path.read_text())
-        for version in (False, 8, "3"):
+        for version in (False, 9, "3"):
             base["version"] = version
             raw = json.dumps(base)
             self.store.path.write_text(raw)

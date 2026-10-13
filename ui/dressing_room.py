@@ -4,7 +4,7 @@ import math
 import tkinter as tk
 from tkinter import ttk
 
-from companion import ATTIRE, RARE_ATTIRE
+from companion import ATTIRE, ATTIRE_STYLE
 from ui.pigeon_sprite import draw_pigeon
 
 
@@ -54,7 +54,7 @@ class DressingRoom:
         record = self.app.flock.selected
         pigeon = self.app.pigeon
         profile = record.companion
-        approved = profile.outfit == profile.appeal_preference
+        approved = ATTIRE_STYLE[profile.outfit] == profile.appeal_preference
         expression = "happy" if approved else "displeased"
         self.look_phase += 0.16
         self.canvas.delete("all")
@@ -76,4 +76,4 @@ class DressingRoom:
         self.preference.configure(
             text=f"{record.name} loves {profile.appeal_preference.lower()} looks. "
                  f"Current outfit: {profile.outfit.lower()}. "
-                 f"Wardrobe: {len(profile.wardrobe)}/{len(ATTIRE) + len(RARE_ATTIRE)}.")
+                 f"Wardrobe: {len(profile.wardrobe)}/{len(ATTIRE)}.")

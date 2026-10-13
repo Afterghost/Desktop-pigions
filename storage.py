@@ -10,7 +10,7 @@ import tempfile
 
 from config import HUNGER_MAX, MAX_STORED_ITEMS, NEST_DATA_FILE
 from desktop import TREASURES
-from companion import ATTIRE, Companion, GIFTS, RARE_ATTIRE, STARTER_ATTIRE
+from companion import ATTIRE, Companion, GIFTS, STARTER_ATTIRE
 from nest import Item, Nest
 from progression import Progression
 from datetime import datetime
@@ -119,20 +119,8 @@ class Store:
                 if data["version"] < 8:
                     flock_data = dict(
                         flock_data,
-                        records=[
-                            dict(
-                                bird,
-                                companion=_add_wardrobe_defaults(
-                                   _add_style_defaults(dict(
-                                       bird["companion"],
-                                       **({"pet_preference": None}
-                                          if data["version"] < 6 else {})))
-                                   if data["version"] < 7 else
-                                   dict(bird["companion"]),
-                                ),
-                            )
-                            for bird in flock_data["records"]
-                        ],
+                        records=[_migrate_flock_record(bird, data["version"])
+                                 for bird in flock_data["records"]],
                     )
                 flock = Flock.from_data(flock_data)
             else:
@@ -214,7 +202,18 @@ def _add_wardrobe_defaults(companion_data):
     data = dict(companion_data)
     owned = list(STARTER_ATTIRE)
     outfit = data.get("outfit")
-    if outfit in (*ATTIRE, *RARE_ATTIRE) and outfit not in owned:
+    if outfit in ATTIRE and outfit not in owned:
         owned.append(outfit)
     data["wardrobe"] = owned
     return data
+
+
+def _migrate_flock_record(record, version):
+    companion_data = dict(record["companion"])
+    if version < 6:
+        companion_data["pet_preference"] = None
+    if version < 7:
+        companion_data = _add_style_defaults(companion_data)
+    if version < 8:
+        companion_data = _add_wardrobe_defaults(companion_data)
+    return dict(record, companion=companion_data)
