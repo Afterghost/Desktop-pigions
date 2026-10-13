@@ -51,6 +51,8 @@ class ExpansionUITests(unittest.TestCase):
                 ui.buttons[winning_choice(ui.game)].invoke()
             self.assertIn(name, profile.progression.achievements)
             self.assertEqual(profile.games_won, GAME_NAMES.index(name) + 1)
+            self.assertEqual(len(self.app.nest.items), GAME_NAMES.index(name) + 1)
+            self.assertIn(self.app.nest.items[-1].kind, ("Treasure", "Fragment"))
             self.assertIsNone(ui.game.claim_reward())
         self.assertEqual(profile, self.app.store.load()[1].companion)
         self.assertEqual(self.app.store.load()[1].companion.progression.forage_cooldown, 300)
@@ -63,18 +65,43 @@ class ExpansionUITests(unittest.TestCase):
         self.root.update()
         ui.start()
         ui.buttons[winning_choice(ui.game)].invoke()
-        ui.window.focus_force()
-        self.root.update()
-        ui.window.event_generate("<Escape>")
-        self.root.update()
-        # Invoke the window-manager close handler, independent of focus.
+        self.assertTrue(ui.overlay_open)
         ui.cancel()
+        self.assertFalse(ui.overlay_open)
         self.assertTrue(ui.game.cancelled)
         self.assertIsNone(ui.game.claim_reward())
         self.assertEqual(self.app.nest.companion.games_won, 0)
         ui.show()
         ui.start_button.invoke()
         self.assertEqual(ui.game.index, 0)
+
+    def test_game_picker_and_choices_run_on_pigeon_overlay(self):
+        ui = self.app.game_window
+        ui.show()
+        self.root.update()
+        bird = self.app.birds[self.app.flock.selected_id]
+        self.assertEqual(ui.window.state(), "withdrawn")
+        self.assertEqual(int(bird.canvas["width"]), 500)
+        self.assertTrue(any("game_panel" in bird.canvas.gettags(item)
+                            for item in bird.canvas.find_all()))
+        self.assertTrue(ui.handle_click(ui.participant, 302, 247))
+        self.assertIsNotNone(ui.game)
+        answer = next(bounds for bounds, action, _ in ui.hit_regions
+                      if action == "answer")
+        x, y = (answer[0] + answer[2]) // 2, (answer[1] + answer[3]) // 2
+        self.assertTrue(ui.handle_click(ui.participant, x, y))
+        self.assertEqual(ui.game.index, 1)
+        ui.cancel()
+
+    def test_overlay_layout_keeps_board_onscreen_at_right_edge(self):
+        ui = self.app.game_window
+        pigeon = self.app.pigeon
+        pigeon.x = self.app.bounds.x + self.app.bounds.width - 96
+        width, height, x, y, offset_x, offset_y = ui.overlay_layout(pigeon)
+        self.assertLessEqual(x, self.app.bounds.x + self.app.bounds.width - width)
+        self.assertEqual(ui.panel_shift, -104)
+        self.assertGreaterEqual(offset_x, width - 120)
+        self.assertGreaterEqual(offset_y, 0)
 
     def test_governing_cancel_protection_trade_cooldown_and_pause(self):
         app = self.app

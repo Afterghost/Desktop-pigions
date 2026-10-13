@@ -20,7 +20,9 @@ def _trait_color(pigeon: Pigeon, palette: dict[str, str], fallback: str) -> str:
 
 
 def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool,
-                holding_pointer: bool = False) -> None:
+                holding_pointer: bool = False, paper_tears=(),
+                feather_playing: bool = False, outfit: str | None = None,
+                expression: str | None = None, look_phase: float = 0) -> None:
     canvas.delete("all")
     body_color = _trait_color(
         pigeon, {"curiosity": "#aab4c4", "calm": "#a7b6ae", "sociability": "#b6a6b3"},
@@ -48,6 +50,10 @@ def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool,
         x1, y1, x2, y2 = points(x1, y1, x2, y2)
         canvas.create_oval(min(x1, x2), y1, max(x1, x2), y2, **kwargs)
 
+    def arc(x1, y1, x2, y2, **kwargs):
+        x1, y1, x2, y2 = points(x1, y1, x2, y2)
+        canvas.create_arc(min(x1, x2), y1, max(x1, x2), y2, **kwargs)
+
     label = "Paused" if paused else f"{pigeon.hunger_label} {pigeon.hunger:.0f}%"
     if pigeon.fed_for > 0:
         label = "Coo! Thank you!"
@@ -64,9 +70,18 @@ def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool,
     canvas.create_line(*points(33, 60, 51, 65), fill="#becad6", width=2)
     oval(54, 32 + peck, 76, 60 + peck, fill="#579c91", outline="#3c746d")
     oval(54, 23 + peck, 82, 47 + peck, fill=head_color, outline="#3d4b5c", width=2)
-    oval(72, 29 + peck, 77, 34 + peck, fill="#111921", outline="white")
+    eye_x = 75 + math.sin(look_phase) * 2
+    oval(eye_x - 2.5, 29 + peck, eye_x + 2.5, 34 + peck,
+         fill="#111921", outline="white")
     canvas.create_polygon(*points(80, 35 + peck, 93, 39 + peck, 80, 42 + peck),
                           fill="#dcad71", outline="#8a6842")
+    if expression == "happy":
+        arc(76, 38, 85, 46, start=200, extent=140, style="arc",
+            outline="#28323b", width=2)
+    elif expression == "displeased":
+        canvas.create_line(*points(76, 44, 81, 41, 86, 44), fill="#28323b", width=2)
+    elif expression == "curious":
+        canvas.create_oval(*points(75, 38, 86, 47), outline="#28323b", width=2)
     if pigeon.hunger > 90:
         canvas.create_line(*points(70, 27 + peck, 79, 30 + peck), fill="#27313e", width=2)
     if pigeon.startled:
@@ -81,3 +96,88 @@ def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool,
     if pigeon.carrying and pigeon.treasure is not None:
         canvas.create_polygon(*points(88, 43, 95, 50, 88, 57, 81, 50),
                               fill=pigeon.treasure.color, outline="#7c6537")
+    outfit = outfit or (pigeon.companion.outfit if pigeon.companion else "Natural")
+    if outfit == "Ribbon":
+        canvas.create_polygon(*points(62, 25, 56, 18, 64, 20, 68, 15, 69, 25),
+                              fill="#dc7184", outline="#8d4352")
+    elif outfit == "Scarf":
+        canvas.create_polygon(*points(56, 51, 77, 51, 75, 58, 58, 58),
+                              fill="#8e6eb3", outline="#594778")
+        canvas.create_polygon(*points(59, 56, 66, 57, 61, 68),
+                              fill="#8e6eb3", outline="#594778")
+    elif outfit == "Cap":
+        arc(57, 17, 82, 35, start=0, extent=180, style="pieslice",
+            fill="#d1aa55", outline="#806538")
+        canvas.create_line(*points(58, 27, 81, 27), fill="#806538", width=3)
+    elif outfit == "Flower":
+        x = 63 if pigeon.facing_right else 33
+        for angle in range(0, 360, 90):
+            radians = math.radians(angle)
+            canvas.create_oval(x + math.cos(radians) * 4 - 3,
+                               24 + math.sin(radians) * 4 - 3,
+                               x + math.cos(radians) * 4 + 3,
+                               24 + math.sin(radians) * 4 + 3,
+                               fill="#ed9aaf", outline="#b95d76")
+        canvas.create_oval(x - 2, 22, x + 2, 26, fill="#e7c45b", outline="")
+    elif outfit == "Feather Crown":
+        canvas.create_polygon(*points(59, 25, 57, 13, 63, 20, 67, 10,
+                                     70, 21, 77, 13, 75, 26),
+                              fill="#d7bd69", outline="#8c7540")
+        canvas.create_line(*points(61, 23, 73, 23), fill="#b45b62", width=2)
+    elif outfit == "Postbird Cap":
+        arc(56, 16, 83, 35, start=0, extent=180, style="pieslice",
+            fill="#526f8b", outline="#344b62")
+        canvas.create_line(*points(56, 27, 84, 27), fill="#344b62", width=3)
+        oval(64, 19, 71, 25, fill="#e8d9a3", outline="#8a7547")
+    elif outfit == "Moon Scarf":
+        canvas.create_polygon(*points(55, 50, 78, 50, 75, 58, 57, 58),
+                              fill="#6589bd", outline="#3b5278")
+        canvas.create_polygon(*points(59, 56, 66, 57, 62, 69),
+                              fill="#6589bd", outline="#3b5278")
+        canvas.create_oval(62, 51, 64, 53, fill="#f5e7a2", outline="")
+        canvas.create_oval(69, 53, 71, 55, fill="#f5e7a2", outline="")
+    elif outfit == "Lucky Coin Necklace":
+        arc(57, 47, 76, 63, start=190, extent=160, style="arc",
+            outline="#b28b37", width=2)
+        oval(64, 57, 72, 65, fill="#e5bf58", outline="#8f7133")
+        canvas.create_text(68, 61, text="★", fill="#8f7133",
+                           font=("TkDefaultFont", 6, "bold"))
+    elif outfit == "Toast Necklace":
+        canvas.create_line(*points(57, 49, 66, 61, 76, 49),
+                           fill="#a78046", width=2)
+        canvas.create_polygon(*points(62, 56, 72, 56, 74, 64, 70, 68,
+                                     64, 67, 60, 63),
+                              fill="#e9b969", outline="#9d693c", width=2)
+        canvas.create_polygon(*points(64, 59, 71, 59, 72, 63, 69, 66,
+                                     65, 65, 62, 62),
+                              fill="#f3dfa7", outline="")
+    elif outfit == "Rooftop Jacket":
+        canvas.create_polygon(*points(29, 52, 39, 56, 50, 55, 61, 50,
+                                     66, 67, 58, 74, 35, 73),
+                              fill="#c16d56", outline="#74463f")
+        canvas.create_line(*points(48, 57, 49, 72), fill="#f0d4a3", width=2)
+        for button_y in (61, 67):
+            oval(46, button_y, 48, button_y + 2, fill="#f0d4a3", outline="")
+    elif outfit == "Pigeon Pin":
+        oval(34, 53, 46, 65, fill="#d9c778", outline="#897944")
+        oval(37, 55, 43, 61, fill="#73899d", outline="#485967")
+        canvas.create_polygon(*points(42, 58, 46, 60, 42, 62),
+                              fill="#dcae72", outline="#8a6842")
+    for tear in paper_tears:
+        progress = min(1, tear["age"] / 0.3)
+        fade = min(1, (9 - tear["age"]) / 2)
+        size = 17 * progress * fade
+        x, y = tear["x"], tear["y"]
+        canvas.create_polygon(x - size, y, x - size / 3, y - 3, x, y + 2,
+                              x + size, y, x + size * 0.3, y + size * 0.55,
+                              fill="#f3ecd9", outline="#b7ac94")
+        for index in range(2):
+            sx = x + math.sin(tear["angle"] + index * 2) * tear["age"] * 5
+            sy = y + progress * (8 + index * 5)
+            small = 2.5 * fade
+            canvas.create_polygon(sx - small, sy, sx + small, sy - small,
+                                  sx + small / 2, sy + small,
+                                  fill="#e2d6ba", outline="")
+    if feather_playing:
+        canvas.create_oval(70, 50, 83, 68, fill="#c8a2d4", outline="#876094")
+        canvas.create_line(80, 52, 73, 70, fill="#785785", width=2)

@@ -46,6 +46,8 @@ class Phase2UITests(unittest.TestCase):
             game_ui.buttons[game_ui.game.current[1]].invoke()
         self.assertEqual(profile.games_won, 1)
         self.assertEqual(profile.food["sunflower_seeds"], 5)
+        self.assertEqual(len(self.app.nest.items), 1)
+        self.assertIn(self.app.nest.items[0].kind, ("Treasure", "Fragment"))
         game_ui.buttons["Treasure"].invoke()
         self.assertEqual(profile.games_won, 1)
         self.assertIn("5/5", game_ui.prompt["text"])
@@ -69,6 +71,57 @@ class Phase2UITests(unittest.TestCase):
         self.assertEqual(len(self.app.nest.items), 1)
         self.assertEqual(self.app.nest.items[0].kind, "Gift")
         self.assertIn("gift:", self.app.nest_window.activity["text"])
+
+    def test_dressing_room_shows_appeal_and_persists_selected_outfit(self):
+        room = self.app.dressing_room
+        profile = self.app.nest.companion
+        room.show()
+        self.root.update()
+        room.buttons[profile.appeal_preference].invoke()
+        self.assertIn("Loves this look", room.expression["text"])
+        self.assertEqual(profile.outfit, profile.appeal_preference)
+        other = next(outfit for outfit in room.buttons if outfit != profile.appeal_preference)
+        room.buttons[other].invoke()
+        self.assertIn("not quite", room.expression["text"])
+        saved = self.app.store.load()[1].companion
+        self.assertEqual(saved.outfit, other)
+        self.assertEqual(saved.appeal_preference, profile.appeal_preference)
+
+    def test_rare_wardrobe_items_unlock_and_equip(self):
+        from companion import RARE_ATTIRE
+
+        room = self.app.dressing_room
+        profile = self.app.nest.companion
+        room.show()
+        self.root.update()
+        self.assertEqual(str(room.buttons[RARE_ATTIRE[0]]["state"]), "disabled")
+        rare = profile.try_find_rare_attire(self.app.rng, 1)
+        self.assertIn(rare, RARE_ATTIRE)
+        self.app.save()
+        room.refresh()
+        self.assertEqual(str(room.buttons[rare]["state"]), "normal")
+        room.buttons[rare].invoke()
+        self.assertEqual(profile.outfit, rare)
+        saved = self.app.store.load()[1].companion
+        self.assertIn(rare, saved.wardrobe)
+        self.assertEqual(saved.outfit, rare)
+
+    def test_winning_game_can_add_a_rare_attire_reward(self):
+        from companion import RARE_ATTIRE
+
+        profile = self.app.nest.companion
+        rare = RARE_ATTIRE[0]
+
+        def grant_attire(rng, chance):
+            self.assertEqual(chance, 0.18)
+            profile.wardrobe.append(rare)
+            return rare
+
+        with patch.object(profile, "try_find_rare_attire", side_effect=grant_attire):
+            self.assertTrue(self.app.reward_game(5, self.app.flock.selected_id))
+        self.assertIn(rare, profile.wardrobe)
+        self.assertIn(f"Rare find: {rare}", self.app.activity_status)
+        self.assertIn(rare, self.app.store.load()[1].companion.wardrobe)
 
     def test_empty_food_does_not_feed_or_increase_friendship(self):
         self.app.nest.companion.food["golden_corn"] = 0

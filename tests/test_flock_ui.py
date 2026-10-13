@@ -125,8 +125,10 @@ class FlockUITests(unittest.TestCase):
         self.assertEqual(app.bird_menu.window.state(), "withdrawn")
 
         app.bird_menu.play_button.invoke()
-        self.assertEqual(app.game_window.window.state(), "normal")
+        self.assertTrue(app.game_window.overlay_open)
+        self.assertEqual(app.birds[child.id].canvas["width"], 500)
         app.game_window.cancel()
+        self.assertEqual(app.birds[child.id].canvas["width"], 96)
         child_pigeon.investigate(Treasure("Blue marble", "Treasure", "#abc",
                                           child_pigeon.x, child_pigeon.y))
         app.bird_menu.shoo_button.invoke()

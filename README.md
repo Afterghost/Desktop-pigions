@@ -23,15 +23,20 @@ Linux: install your distribution’s Tkinter package (e.g. `python3-tk`) and use
 backgrounds; other platforms use small opaque tiles as a preview fallback.
 Windows is the intended desktop target; multi-monitor roaming is not implemented.
 
-## Separate session-local interaction prototype
+## Drag tray and paper effects
 
-Run `python interaction_app.py` (or `py interaction_app.py` on Windows) for the
-alternative drag-food/feather and cosmetic paper-tear prototype. Add `--preview`
-for a normal window; non-Windows platforms use that preview automatically.
-Drag treats from the edge tray, or use **Smooth it out** to clear temporary tears.
-This alternative keeps everything in memory, resets on exit, and does not read,
-write, or share the flock app's saves. The default `py main.py` remains the
-persistent flock companion described below.
+The persistent `main.py` app includes a pantry tray in the nest. Drag an available
+food onto any pigeon to feed it using that bird's saved food portions and care
+progression; seed mix remains free. Drag a play feather onto a pigeon for a short
+cosmetic play animation without bypassing minigame rewards. Existing feed buttons
+remain available. Idle pigeons occasionally make temporary paper-tear drawings;
+they fade automatically, or **Smooth it out** clears them immediately. These
+effects are session-only and never change the save format.
+
+`python interaction_app.py` (or `py interaction_app.py` on Windows) remains an
+optional, standalone interaction prototype. Add `--preview` for a normal window;
+non-Windows platforms use that preview automatically. Its in-memory state is
+separate from the persistent flock app.
 
 ## Controls and gameplay
 
@@ -45,6 +50,11 @@ persistent flock companion described below.
   and cooperative collections without a reward.
 - **Right-click a pigeon** for a small action bubble above its head with Feed,
   Play, and Shoo. Right-click the nest for the general menu, including pause and quit.
+- Open **Dress pigeon** in the nest to preview and equip a ribbon, scarf, cap,
+  flower, or a rare wearable. Rare wardrobe finds include feather crowns,
+  postbird caps, moon scarves, coin/toast necklaces, rooftop jackets, and pigeon
+  pins. The pigeon looks around and reacts to its favorite style. Each bird's
+  wardrobe, equipped item, and preference are saved separately.
 - Open **Developer settings** in the nest to tune flight speed, roaming distance,
   rest duration, and treasure interval for the current session (these tuning values
   reset when the app closes). The same panel lets you select double-click and/or
@@ -54,9 +64,15 @@ persistent flock companion described below.
   press Escape to restore the system pointer and startle the pigeon into a quick
   flight; a two-second failsafe restores it automatically. Pointer positions are
   sampled locally and never saved or sent anywhere.
-- **Offer a shiny** starts a collection immediately. The pigeon also finds one
-  automatically after about six seconds, then every 21–39 seconds depending on
-  curiosity, when available.
+- **Offer a shiny** starts a collection immediately. Natural foraging is different:
+  while resting, a pigeon makes a temporary paper-tear drawing when its forage
+  timer expires, then has a **35% chance** to uncover a generated item. A failed
+  search must wait for the next tear before trying again; curiosity affects the
+  timer. Successful searches have an additional **8% chance** to find an unowned
+  rare wearable instead of a regular trinket. Friendly shared foraging also starts
+  from a successful tear-triggered search.
+- Use the nest's **drag tray** to drop food onto any active pigeon or a feather
+  for a brief play animation. **Smooth it out** clears temporary tear drawings.
 - Watch **Investigating → Approaching → Theft attempt → Escaping → Nest storage**.
   A pulsing diamond and carried fragment are *only drawings*: nothing is taken
   from a real desktop icon or file.
@@ -89,7 +105,10 @@ persistent flock companion described below.
   ribbon bouquet, polished bottle cap, or friendship twig
   every two active minutes. These appear as **Gift** entries in the nest and a
   visible notification; they never come from real desktop files.
-- Open **Play minigames** from the nest or pigeon menu and choose a game:
+- Open **Play minigames** from the nest or pigeon menu. The game board expands
+  directly from the selected pigeon overlay (no separate game window); use the
+  on-screen tap/click choices and close it with **×**. The board stays within the
+  usable screen area and keeps the pigeon visible beside the play area. Games:
   - **Shiny Sorting**: sort five items:
   buttons/marbles are Treasures; foil/paper are Fragments. At least three correct
   earns two sunflower-seed portions and friendship equal to the score. A perfect
@@ -105,8 +124,12 @@ persistent flock companion described below.
     exhausted or resting unnecessarily misses the turn. Attempts have a persisted
     300-active-second cooldown, including cancelled/failed attempts. “Daily” is a
     local gameplay name, not a wall-clock calendar or network event.
-  All games are untimed, five-turn MVPs with on-screen instructions and the same
-  3+ correct reward rule. Pause disables all answers and memory hiding.
+  All games are untimed, five-turn MVPs with on-overlay instructions and the same
+  3+ correct reward rule. Winning earns a generated nest trinket plus two sunflower
+  portions; a perfect score also earns golden corn. Pause disables all answers and
+  memory hiding. Wins also have a score-based chance to find an unowned rare wearable:
+  3% for three correct, 8% for four, and 18% for a perfect score. Return earned
+  trinkets from the nest inventory to build friendship.
   Closing/Escape/cancelling a game discards the round **without rewards**.
   Unfinished games reset on app exit. The other minigames intentionally use small
   turn-based mechanics rather than real-time arcade simulations.
@@ -219,20 +242,15 @@ Only the app’s own `nest_data.json` is read/written:
 - Windows: `%LOCALAPPDATA%\DesktopPigeon\nest_data.json`
 - Linux: `${XDG_DATA_HOME:-~/.local/share}/DesktopPigeon/nest_data.json`
 
-The versioned save contains hunger, friendship, traits, food portions, cooldowns,
-game win count, bounded achievements/action counts, neglect/cooldown timers,
-forgiveness, protected synthetic types, and generated item names/types/IDs/times.
-Existing version 1/2/3/4 saves are read without rewriting and upgrade to **version 5**
-on the next successful save, preserving hunger, items, and all existing version 2
-traits/food/friendship/timers/wins. Version 1 has no traits, so migration supplies
-deterministic neutral traits rather than rerolling them. Version 3 preserves
-evolved traits exactly across reloads. Version 4 adds per-bird hunger/lifetime,
-identities, parentage, permanent departure legacy, grace, eggs, nest level/treasury,
-selected ID and social timers. Version 5 adds bounded mutual bonds and structured
-permanent/recent chronicles, retaining every earlier profile, egg, item and legacy.
+The versioned save contains hunger, friendship, traits, food portions, owned and
+equipped outfits, appeal preferences, cooldowns, bounded achievements/action counts,
+flock history, and generated item names/types/IDs/times. Versions 1–7 are read without
+rewriting and upgraded to **version 8** on the next successful save. Migrations preserve
+existing items, profiles, eggs, and legacy; older companions receive a stable
+appeal preference derived from personality and the default starter wardrobe.
 All saved fields, counters, finite timers and cross-record references are validated.
 Unsupported/corrupt saves remain intact.
-Downgrading to earlier phases cannot read version 5 saves; keep a
+Downgrading to earlier phases cannot read version 8 saves; keep a
 manual backup of the app's own save before downgrading.
 Saves occur on feeding, collection, every ten active seconds, and exit, using
 atomic replacement. Position and unfinished thefts are not persisted. If a save

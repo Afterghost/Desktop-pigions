@@ -140,6 +140,22 @@ class SocialTests(unittest.TestCase):
         self.assertIsNone(motion.collaboration)
         self.assertIsNone(leader.treasure)
 
+    def test_automatic_shared_find_can_start_only_from_tear_search(self):
+        flock = family()
+        a, b = flock.active
+        flock.bond(a.id, b.id).affinity = 40
+        bounds = Bounds(-100, -50, 800, 600)
+        pigeons = {bird.id: Pigeon(bounds, (500, 400), companion=bird.companion)
+                   for bird in flock.active}
+        motion = SocialMotion()
+        target = Treasure("Blue marble", "Treasure", "#abc", 200, 200)
+        motion.start(flock, pigeons, lambda pigeon: target, allow_foraging=False)
+        self.assertIsNone(motion.collaboration)
+        self.assertTrue(motion.start_foraging(
+            a.id, flock, pigeons, lambda pigeon: target))
+        self.assertEqual(motion.collaboration.leader, a.id)
+        self.assertIs(pigeons[a.id].treasure, target)
+
     def test_rival_yielding_has_no_inventory_or_hunger_reward(self):
         flock = family()
         flock.bonds[0].affinity = -40
@@ -186,14 +202,22 @@ class StoryStorageTests(unittest.TestCase):
         data["flock"].pop("bonds")
         data["flock"].pop("chronicle")
         data["companion"].pop("pet_preference")
+        data["companion"].pop("outfit")
+        data["companion"].pop("appeal_preference")
+        data["companion"].pop("wardrobe")
         for bird in data["flock"]["records"]:
             bird["companion"].pop("pet_preference")
+            bird["companion"].pop("outfit")
+            bird["companion"].pop("appeal_preference")
+            bird["companion"].pop("wardrobe")
         raw = json.dumps(data)
         self.store.path.write_text(raw)
         hunger, migrated = self.store.load()
         self.assertEqual(self.store.path.read_text(), raw)
         for restored, original in zip(migrated.flock.records, flock.records):
             original.companion.pet_preference = restored.companion.pet_preference
+            original.companion.outfit = restored.companion.outfit
+            original.companion.appeal_preference = restored.companion.appeal_preference
         self.assertEqual(migrated.flock.records, flock.records)
         self.assertEqual(migrated.flock.eggs, flock.eggs)
         self.assertEqual({e.kind for e in migrated.flock.chronicle.core}, {"origins", "egg_origins"})

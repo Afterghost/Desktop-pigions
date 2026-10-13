@@ -6,7 +6,7 @@ import random
 import tempfile
 import unittest
 
-from companion import Companion, GIFTS, PettingGesture
+from companion import ATTIRE_STYLE, Companion, GIFTS, PettingGesture, RARE_ATTIRE
 from desktop import Bounds, Treasure
 from minigames import ShinySorting
 from nest import Nest
@@ -163,6 +163,42 @@ class CompanionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.profile.reward_game(2)
 
+    def test_appeal_preference_is_stable_and_outfits_are_validated(self):
+        profile = Companion(traits={"curiosity": 10, "calm": 20, "sociability": 80})
+        self.assertEqual(profile.appeal_preference, "Ribbon")
+        profile.traits = {"curiosity": 90, "calm": 20, "sociability": 10}
+        self.assertEqual(profile.appeal_preference, "Ribbon")
+        profile.outfit = "Ribbon"
+        self.assertEqual(Companion.from_data(asdict(profile)).outfit, "Ribbon")
+        invalid = asdict(profile)
+        invalid["outfit"] = "Wallpaper"
+        with self.assertRaises(ValueError):
+            Companion.from_data(invalid)
+
+    def test_rare_attire_unlocks_once_and_is_required_to_equip(self):
+        profile = Companion()
+        rng = random.Random(3)
+        found = profile.try_find_rare_attire(rng, 1)
+        self.assertIn(found, RARE_ATTIRE)
+        self.assertIn(found, profile.wardrobe)
+        self.assertIsNone(profile.try_find_rare_attire(rng, 0))
+        for _ in range(len(RARE_ATTIRE) - 1):
+            profile.try_find_rare_attire(rng, 1)
+        self.assertEqual(len(set(profile.wardrobe)), len(profile.wardrobe))
+        self.assertIsNone(profile.try_find_rare_attire(rng, 1))
+        profile.outfit = found
+        self.assertEqual(Companion.from_data(asdict(profile)).outfit, found)
+        invalid = asdict(profile)
+        invalid["wardrobe"].append(found)
+        with self.assertRaises(ValueError):
+            Companion.from_data(invalid)
+        self.assertEqual(ATTIRE_STYLE["Feather Crown"], "Cap")
+        self.assertEqual(ATTIRE_STYLE["Toast Necklace"], "Ribbon")
+        invalid = asdict(profile)
+        invalid["wardrobe"].remove(profile.outfit)
+        with self.assertRaises(ValueError):
+            Companion.from_data(invalid)
+
 
 class Phase2StorageTests(unittest.TestCase):
     def setUp(self):
@@ -184,7 +220,7 @@ class Phase2StorageTests(unittest.TestCase):
         nest.companion.befriend(25)
         nest.collect(Treasure(GIFTS[0], "Gift", "#e6ad24", 0, 0))
         self.store.save(hunger, nest)
-        self.assertEqual(json.loads(self.store.path.read_text())["version"], 6)
+        self.assertEqual(json.loads(self.store.path.read_text())["version"], 8)
         self.assertEqual(self.store.load(), (hunger, nest))
 
     def test_invalid_phase2_data_is_preserved(self):
@@ -193,7 +229,10 @@ class Phase2StorageTests(unittest.TestCase):
         for field, value in (("friendship", True), ("friendship", 101),
                              ("traits", {}), ("food", {"seed_mix": 4}),
                              ("gift_timer", float("nan")), ("pet_cooldown", -1),
-                             ("games_won", "one")):
+                             ("games_won", "one"), ("outfit", "Wallpaper"),
+                             ("appeal_preference", "Wallpaper"),
+                             ("wardrobe", ["Natural", "Natural"]),
+                             ("wardrobe", ["Wallpaper"])):
             modified = json.loads(json.dumps(data))
             modified["companion"][field] = value
             raw = json.dumps(modified)

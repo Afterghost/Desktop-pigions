@@ -70,6 +70,8 @@ class NestWindow:
                    command=lambda: app.developer_settings.show()).pack(side="left", padx=5)
         ttk.Button(social, text="Play minigames",
                    command=lambda: app.game_window.show()).pack(side="left", padx=5)
+        ttk.Button(social, text="Dress pigeon",
+                   command=app.dressing_room.show).pack(side="left", padx=5)
         ttk.Button(social, text="Family stories / activity",
                    command=self.stories.show).pack(side="left")
         self.bonds = ttk.Label(frame, wraplength=540)
@@ -101,11 +103,24 @@ class NestWindow:
             self.protection_buttons[kind] = button
         food_frame = ttk.LabelFrame(frame, text="Feed (seed mix is always free)", padding=5)
         food_frame.pack(fill="x")
+        ttk.Label(food_frame, text="Drag a food or feather onto a pigeon, or use the buttons below."
+                  ).grid(row=0, column=0, columnspan=3, sticky="w")
+        tray_items = tuple(FOOD_TYPES) + ("feather",)
+        tray_labels = {food: food.replace("_", " ").title() for food in FOOD_TYPES}
+        tray_labels["feather"] = "Play feather"
+        self.tray_items = {}
+        for index, item in enumerate(tray_items):
+            tile = tk.Label(food_frame, text=tray_labels[item], relief="ridge", padx=5, pady=4,
+                            cursor="hand2")
+            tile.grid(row=1 + index // 3, column=index % 3, padx=3, pady=2, sticky="ew")
+            tile.bind("<ButtonPress-1>",
+                      lambda event, item=item: app.begin_drag(item, event.widget))
+            self.tray_items[item] = tile
         self.food_buttons = {}
         for index, food in enumerate(FOOD_TYPES):
             button = ttk.Button(food_frame, text=food.replace("_", " ").title(),
                                 command=lambda food=food: app.feed(food))
-            button.grid(row=index // 3, column=index % 3, padx=3, pady=2, sticky="ew")
+            button.grid(row=3 + index // 3, column=index % 3, padx=3, pady=2, sticky="ew")
             self.food_buttons[food] = button
         for column in range(3):
             food_frame.columnconfigure(column, weight=1)
@@ -134,6 +149,7 @@ class NestWindow:
         self.shiny_button.pack(side="left")
         self.pause_button = ttk.Button(controls, command=app.toggle_pause)
         self.pause_button.pack(side="left", padx=5)
+        ttk.Button(controls, text="Smooth it out", command=app.smooth_tears).pack(side="left")
         ttk.Button(controls, text="Quit", command=app.close).pack(side="right")
 
     def show(self) -> None:
@@ -213,6 +229,15 @@ class NestWindow:
             portions = "free" if food == "seed_mix" else str(profile.food[food])
             button.configure(text=f"{food.replace('_', ' ').title()} ({portions})",
                              state="normal" if food == "seed_mix" or profile.food[food] else "disabled")
+        for food, tile in self.tray_items.items():
+            if food == "feather":
+                label = "Play feather"
+            else:
+                portions = "free" if food == "seed_mix" else profile.food[food]
+                label = f"{food.replace('_', ' ').title()} · {portions}"
+            available = (food == "feather" or food == "seed_mix" or profile.food[food] > 0)
+            tile.configure(text=label, state="normal"
+                           if available and app.has_bird and not app.paused else "disabled")
         self.summary.configure(text=f"Hunger: {pigeon.hunger_label} ({pigeon.hunger:.0f}/100)"
                                f" — {'Paused' if app.paused else pigeon.behavior.value}")
         self.hunger["value"] = pigeon.hunger
@@ -234,3 +259,5 @@ class NestWindow:
                            *self.food_buttons.values(), *self.intervention_buttons.values(),
                            *self.protection_buttons.values()):
                 button.configure(state="disabled")
+            for tile in self.tray_items.values():
+                tile.configure(state="disabled")

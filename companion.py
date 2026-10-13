@@ -12,6 +12,27 @@ GIFTS = ("Soft feather", "Lucky coin", "Tiny glass pebble", "Ribbon bouquet",
          "Polished bottle cap", "Friendship twig")
 TRAITS = ("curiosity", "calm", "sociability")
 PETTING_SPEEDS = ("slow", "steady", "quick")
+STARTER_ATTIRE = ("Natural", "Ribbon", "Scarf", "Cap", "Flower")
+RARE_ATTIRE = (
+    "Feather Crown", "Postbird Cap", "Moon Scarf", "Lucky Coin Necklace",
+    "Toast Necklace", "Rooftop Jacket", "Pigeon Pin",
+)
+ATTIRE = (*STARTER_ATTIRE, *RARE_ATTIRE)
+APPEAL_STYLES = ("Ribbon", "Scarf", "Cap", "Flower")
+ATTIRE_STYLE = {
+    "Natural": None,
+    "Ribbon": "Ribbon",
+    "Scarf": "Scarf",
+    "Cap": "Cap",
+    "Flower": "Flower",
+    "Feather Crown": "Cap",
+    "Postbird Cap": "Cap",
+    "Moon Scarf": "Scarf",
+    "Lucky Coin Necklace": "Ribbon",
+    "Toast Necklace": "Ribbon",
+    "Rooftop Jacket": "Scarf",
+    "Pigeon Pin": "Flower",
+}
 
 
 @dataclass
@@ -26,12 +47,20 @@ class Companion:
     games_won: int = 0
     progression: Progression = field(default_factory=Progression)
     pet_preference: str | None = None
+    outfit: str = "Natural"
+    appeal_preference: str | None = None
+    wardrobe: list[str] = field(default_factory=lambda: list(STARTER_ATTIRE))
 
     def __post_init__(self):
         if self.pet_preference is None:
             dominant = max(TRAITS, key=lambda name: self.traits[name])
             self.pet_preference = {"calm": "slow", "sociability": "steady",
                                    "curiosity": "quick"}[dominant]
+        if self.appeal_preference is None:
+            dominant = max(TRAITS, key=lambda name: self.traits[name])
+            self.appeal_preference = {
+                "calm": "Scarf", "sociability": "Ribbon", "curiosity": "Cap",
+            }[dominant]
 
     @property
     def relationship(self) -> str:
@@ -121,6 +150,17 @@ class Companion:
         if score == 5:
             self.food["golden_corn"] = min(99, self.food["golden_corn"] + 1)
 
+    def try_find_rare_attire(self, rng: random.Random, chance: float) -> str | None:
+        if (type(chance) not in (int, float) or not math.isfinite(chance)
+                or not 0 <= chance <= 1):
+            raise ValueError("Invalid rare attire chance")
+        available = [item for item in RARE_ATTIRE if item not in self.wardrobe]
+        if not available or rng.random() >= chance:
+            return None
+        found = rng.choice(available)
+        self.wardrobe.append(found)
+        return found
+
     @classmethod
     def from_data(cls, data: dict) -> "Companion":
         if not isinstance(data, dict) or set(data) != set(cls.__dataclass_fields__):
@@ -142,6 +182,15 @@ class Companion:
                 raise ValueError("Invalid companion timer")
         if profile.pet_preference not in PETTING_SPEEDS:
             raise ValueError("Invalid petting preference")
+        if (profile.outfit not in ATTIRE
+                or profile.appeal_preference not in APPEAL_STYLES
+                or not isinstance(profile.wardrobe, list)
+                or not all(isinstance(item, str) and item in ATTIRE
+                           for item in profile.wardrobe)
+                or len(profile.wardrobe) != len(set(profile.wardrobe))
+                or not set(STARTER_ATTIRE).issubset(profile.wardrobe)
+                or profile.outfit not in profile.wardrobe):
+            raise ValueError("Invalid outfit or appeal preference")
         return profile
 
 

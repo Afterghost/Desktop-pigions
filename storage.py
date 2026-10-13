@@ -10,7 +10,7 @@ import tempfile
 
 from config import HUNGER_MAX, MAX_STORED_ITEMS, NEST_DATA_FILE
 from desktop import TREASURES
-from companion import Companion, GIFTS
+from companion import ATTIRE, Companion, GIFTS, STARTER_ATTIRE
 from nest import Item, Nest
 from progression import Progression
 from datetime import datetime
@@ -51,7 +51,7 @@ class Store:
                     result[key] = value
                 return result
             data = json.loads(raw, object_pairs_hook=unique_object)
-            if type(data["version"]) is not int or data["version"] not in (1, 2, 3, 4, 5, 6):
+            if type(data["version"]) is not int or data["version"] not in (1, 2, 3, 4, 5, 6, 7, 8):
                 raise ValueError("Unsupported save version")
             expected = {"version", "hunger", "items"} | ({"companion"} if data["version"] >= 2 else set())
             if data["version"] >= 4:
@@ -84,7 +84,8 @@ class Store:
                 if data["version"] == 2:
                     if (not isinstance(profile_data, dict)
                             or set(profile_data) != set(Companion.__dataclass_fields__)
-                            - {"progression", "pet_preference"}):
+                            - {"progression", "pet_preference", "outfit",
+                               "appeal_preference", "wardrobe"}):
                         raise ValueError("Invalid legacy companion")
                     profile_data = dict(profile_data, progression=asdict(Progression()),
                                          pet_preference=None)
@@ -97,6 +98,10 @@ class Store:
                                          pet_preference=None)
                 elif data["version"] < 6:
                     profile_data = dict(profile_data, pet_preference=None)
+                if data["version"] < 7:
+                    profile_data = _add_style_defaults(profile_data)
+                if data["version"] < 8:
+                    profile_data = _add_wardrobe_defaults(profile_data)
                 profile = Companion.from_data(profile_data)
             else:
                 profile = Companion(traits=dict.fromkeys(("curiosity", "calm", "sociability"), 50))
@@ -111,10 +116,10 @@ class Store:
                     origins += [asdict(Event("egg_origins", [e["id"]], e["traits"]))
                                 for e in flock_data["eggs"]]
                     flock_data = dict(flock_data, bonds=[], chronicle={"core": origins, "recent": []})
-                if data["version"] < 6:
+                if data["version"] < 8:
                     flock_data = dict(
                         flock_data,
-                        records=[dict(bird, companion=dict(bird["companion"], pet_preference=None))
+                        records=[_migrate_flock_record(bird, data["version"])
                                  for bird in flock_data["records"]],
                     )
                 flock = Flock.from_data(flock_data)
@@ -167,7 +172,7 @@ class Store:
                                              dir=self.directory, prefix=".nest-",
                                              suffix=".tmp", delete=False) as handle:
                 temporary = Path(handle.name)
-                json.dump({"version": 6, "hunger": hunger,
+                json.dump({"version": 8, "hunger": hunger,
                            "companion": asdict(nest.companion),
                            "flock": asdict(nest.flock),
                            "items": [asdict(item) for item in nest.items]}, handle,
@@ -183,3 +188,32 @@ class Store:
                     temporary.unlink(missing_ok=True)
                 except OSError:
                     pass
+
+
+def _add_style_defaults(companion_data):
+    """Supply style fields when migrating saves written before dressing rooms."""
+    data = dict(companion_data)
+    data["outfit"] = "Natural"
+    data["appeal_preference"] = None
+    return data
+
+
+def _add_wardrobe_defaults(companion_data):
+    data = dict(companion_data)
+    owned = list(STARTER_ATTIRE)
+    outfit = data.get("outfit")
+    if outfit in ATTIRE and outfit not in owned:
+        owned.append(outfit)
+    data["wardrobe"] = owned
+    return data
+
+
+def _migrate_flock_record(record, version):
+    companion_data = dict(record["companion"])
+    if version < 6:
+        companion_data["pet_preference"] = None
+    if version < 7:
+        companion_data = _add_style_defaults(companion_data)
+    if version < 8:
+        companion_data = _add_wardrobe_defaults(companion_data)
+    return dict(record, companion=companion_data)
