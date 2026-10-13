@@ -140,6 +140,22 @@ class SocialTests(unittest.TestCase):
         self.assertIsNone(motion.collaboration)
         self.assertIsNone(leader.treasure)
 
+    def test_automatic_shared_find_can_start_only_from_tear_search(self):
+        flock = family()
+        a, b = flock.active
+        flock.bond(a.id, b.id).affinity = 40
+        bounds = Bounds(-100, -50, 800, 600)
+        pigeons = {bird.id: Pigeon(bounds, (500, 400), companion=bird.companion)
+                   for bird in flock.active}
+        motion = SocialMotion()
+        target = Treasure("Blue marble", "Treasure", "#abc", 200, 200)
+        motion.start(flock, pigeons, lambda pigeon: target, allow_foraging=False)
+        self.assertIsNone(motion.collaboration)
+        self.assertTrue(motion.start_foraging(
+            a.id, flock, pigeons, lambda pigeon: target))
+        self.assertEqual(motion.collaboration.leader, a.id)
+        self.assertIs(pigeons[a.id].treasure, target)
+
     def test_rival_yielding_has_no_inventory_or_hunger_reward(self):
         flock = family()
         flock.bonds[0].affinity = -40

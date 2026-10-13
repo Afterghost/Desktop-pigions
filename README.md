@@ -59,12 +59,13 @@ separate from the persistent flock app.
   press Escape to restore the system pointer and startle the pigeon into a quick
   flight; a two-second failsafe restores it automatically. Pointer positions are
   sampled locally and never saved or sent anywhere.
-- **Offer a shiny** starts a collection immediately. The pigeon also finds one
-  automatically after about six seconds, then every 21–39 seconds depending on
-  curiosity, when available.
+- **Offer a shiny** starts a collection immediately. Natural foraging is different:
+  while resting, a pigeon makes a temporary paper-tear drawing when its forage
+  timer expires, then has a **35% chance** to uncover a generated item. A failed
+  search must wait for the next tear before trying again; curiosity affects the
+  timer. Friendly shared foraging also starts from a successful tear-triggered search.
 - Use the nest's **drag tray** to drop food onto any active pigeon or a feather
-  for a brief play animation. Idle pigeons may tear temporary paper drawings;
-  **Smooth it out** clears every bird's drawings.
+  for a brief play animation. **Smooth it out** clears temporary tear drawings.
 - Watch **Investigating → Approaching → Theft attempt → Escaping → Nest storage**.
   A pulsing diamond and carried fragment are *only drawings*: nothing is taken
   from a real desktop icon or file.

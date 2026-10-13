@@ -92,27 +92,51 @@ class SocialMotion:
                 and all(task.target.kind not in pigeons[i].companion.progression.protected
                         for i in (task.leader, task.partner)))
 
-    def start(self, flock, pigeons, target_factory):
+    def start(self, flock, pigeons, target_factory, allow_foraging=True):
         if self.collaboration or self.avoidance or self.greeting:
             return
         active = {b.id for b in flock.active}
         bonds = [b for b in flock.bonds if all(i in active for i in b.actors)]
-        for bond in sorted(bonds, key=lambda b: b.affinity, reverse=True):
-            a, b = (pigeons[i] for i in bond.actors)
-            if a.treasure is not None or b.treasure is not None:
-                continue
-            if bond.status == "Friendship":
-                target = target_factory(a)
-                if target.kind in b.companion.progression.protected or not a.investigate(target):
+        if allow_foraging:
+            for bond in sorted(bonds, key=lambda b: b.affinity, reverse=True):
+                a, b = (pigeons[i] for i in bond.actors)
+                if a.treasure is not None or b.treasure is not None:
                     continue
-                self.collaboration = Collaboration(*bond.actors, target)
-                self.labels = {bond.actors[0]: "Shared forage", bond.actors[1]: "Following friend"}
-                return
+                if bond.status == "Friendship":
+                    target = target_factory(a)
+                    if target.kind in b.companion.progression.protected or not a.investigate(target):
+                        continue
+                    self.collaboration = Collaboration(*bond.actors, target)
+                    self.labels = {bond.actors[0]: "Shared forage", bond.actors[1]: "Following friend"}
+                    return
         for bond in bonds:
             if bond.status == "Rivalry" and all(pigeons[i].treasure is None for i in bond.actors):
                 self.avoidance = [*bond.actors, 5.0]
                 self.labels = {bond.actors[0]: "Giving space", bond.actors[1]: "Rival nearby"}
                 return
+
+    def start_foraging(self, leader_id, flock, pigeons, target_factory):
+        if self.collaboration or self.avoidance or self.greeting:
+            return False
+        active = {bird.id for bird in flock.active}
+        bonds = sorted(
+            (bond for bond in flock.bonds if leader_id in bond.actors
+             and bond.status == "Friendship"
+             and all(identity in active for identity in bond.actors)),
+            key=lambda bond: bond.affinity, reverse=True)
+        for bond in bonds:
+            partner_id = next(identity for identity in bond.actors if identity != leader_id)
+            leader, partner = pigeons[leader_id], pigeons[partner_id]
+            if leader.treasure is not None or partner.treasure is not None:
+                continue
+            target = target_factory(leader)
+            if (target.kind in partner.companion.progression.protected
+                    or not leader.investigate(target)):
+                continue
+            self.collaboration = Collaboration(leader_id, partner_id, target)
+            self.labels = {leader_id: "Shared forage", partner_id: "Following friend"}
+            return True
+        return False
 
     def advance(self, seconds, flock, pigeons):
         active = {b.id for b in flock.active}
