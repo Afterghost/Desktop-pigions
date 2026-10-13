@@ -12,6 +12,8 @@ GIFTS = ("Soft feather", "Lucky coin", "Tiny glass pebble", "Ribbon bouquet",
          "Polished bottle cap", "Friendship twig")
 TRAITS = ("curiosity", "calm", "sociability")
 PETTING_SPEEDS = ("slow", "steady", "quick")
+ATTIRE = ("Natural", "Ribbon", "Scarf", "Cap", "Flower")
+APPEAL_STYLES = ("Ribbon", "Scarf", "Cap", "Flower")
 
 
 @dataclass
@@ -26,12 +28,19 @@ class Companion:
     games_won: int = 0
     progression: Progression = field(default_factory=Progression)
     pet_preference: str | None = None
+    outfit: str = "Natural"
+    appeal_preference: str | None = None
 
     def __post_init__(self):
         if self.pet_preference is None:
             dominant = max(TRAITS, key=lambda name: self.traits[name])
             self.pet_preference = {"calm": "slow", "sociability": "steady",
                                    "curiosity": "quick"}[dominant]
+        if self.appeal_preference is None:
+            dominant = max(TRAITS, key=lambda name: self.traits[name])
+            self.appeal_preference = {
+                "calm": "Scarf", "sociability": "Ribbon", "curiosity": "Cap",
+            }[dominant]
 
     @property
     def relationship(self) -> str:
@@ -142,6 +151,8 @@ class Companion:
                 raise ValueError("Invalid companion timer")
         if profile.pet_preference not in PETTING_SPEEDS:
             raise ValueError("Invalid petting preference")
+        if profile.outfit not in ATTIRE or profile.appeal_preference not in APPEAL_STYLES:
+            raise ValueError("Invalid outfit or appeal preference")
         return profile
 
 

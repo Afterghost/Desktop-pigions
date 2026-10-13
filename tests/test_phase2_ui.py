@@ -72,6 +72,21 @@ class Phase2UITests(unittest.TestCase):
         self.assertEqual(self.app.nest.items[0].kind, "Gift")
         self.assertIn("gift:", self.app.nest_window.activity["text"])
 
+    def test_dressing_room_shows_appeal_and_persists_selected_outfit(self):
+        room = self.app.dressing_room
+        profile = self.app.nest.companion
+        room.show()
+        self.root.update()
+        room.buttons[profile.appeal_preference].invoke()
+        self.assertIn("Loves this look", room.expression["text"])
+        self.assertEqual(profile.outfit, profile.appeal_preference)
+        other = next(outfit for outfit in room.buttons if outfit != profile.appeal_preference)
+        room.buttons[other].invoke()
+        self.assertIn("not quite", room.expression["text"])
+        saved = self.app.store.load()[1].companion
+        self.assertEqual(saved.outfit, other)
+        self.assertEqual(saved.appeal_preference, profile.appeal_preference)
+
     def test_empty_food_does_not_feed_or_increase_friendship(self):
         self.app.nest.companion.food["golden_corn"] = 0
         hunger = self.app.pigeon.hunger

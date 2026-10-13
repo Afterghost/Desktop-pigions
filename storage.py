@@ -51,7 +51,7 @@ class Store:
                     result[key] = value
                 return result
             data = json.loads(raw, object_pairs_hook=unique_object)
-            if type(data["version"]) is not int or data["version"] not in (1, 2, 3, 4, 5, 6):
+            if type(data["version"]) is not int or data["version"] not in (1, 2, 3, 4, 5, 6, 7):
                 raise ValueError("Unsupported save version")
             expected = {"version", "hunger", "items"} | ({"companion"} if data["version"] >= 2 else set())
             if data["version"] >= 4:
@@ -84,7 +84,8 @@ class Store:
                 if data["version"] == 2:
                     if (not isinstance(profile_data, dict)
                             or set(profile_data) != set(Companion.__dataclass_fields__)
-                            - {"progression", "pet_preference"}):
+                            - {"progression", "pet_preference", "outfit",
+                               "appeal_preference"}):
                         raise ValueError("Invalid legacy companion")
                     profile_data = dict(profile_data, progression=asdict(Progression()),
                                          pet_preference=None)
@@ -97,6 +98,8 @@ class Store:
                                          pet_preference=None)
                 elif data["version"] < 6:
                     profile_data = dict(profile_data, pet_preference=None)
+                if data["version"] < 7:
+                    profile_data = _add_style_defaults(profile_data)
                 profile = Companion.from_data(profile_data)
             else:
                 profile = Companion(traits=dict.fromkeys(("curiosity", "calm", "sociability"), 50))
@@ -111,10 +114,12 @@ class Store:
                     origins += [asdict(Event("egg_origins", [e["id"]], e["traits"]))
                                 for e in flock_data["eggs"]]
                     flock_data = dict(flock_data, bonds=[], chronicle={"core": origins, "recent": []})
-                if data["version"] < 6:
+                if data["version"] < 7:
                     flock_data = dict(
                         flock_data,
-                        records=[dict(bird, companion=dict(bird["companion"], pet_preference=None))
+                        records=[dict(bird, companion=_add_style_defaults(
+                            dict(bird["companion"], **(
+                                {"pet_preference": None} if data["version"] < 6 else {}))))
                                  for bird in flock_data["records"]],
                     )
                 flock = Flock.from_data(flock_data)
@@ -167,7 +172,7 @@ class Store:
                                              dir=self.directory, prefix=".nest-",
                                              suffix=".tmp", delete=False) as handle:
                 temporary = Path(handle.name)
-                json.dump({"version": 6, "hunger": hunger,
+                json.dump({"version": 7, "hunger": hunger,
                            "companion": asdict(nest.companion),
                            "flock": asdict(nest.flock),
                            "items": [asdict(item) for item in nest.items]}, handle,
@@ -183,3 +188,11 @@ class Store:
                     temporary.unlink(missing_ok=True)
                 except OSError:
                     pass
+
+
+def _add_style_defaults(companion_data):
+    """Supply style fields when migrating saves written before dressing rooms."""
+    data = dict(companion_data)
+    data["outfit"] = "Natural"
+    data["appeal_preference"] = None
+    return data

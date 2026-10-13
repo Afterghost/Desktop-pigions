@@ -50,6 +50,10 @@ separate from the persistent flock app.
   and cooperative collections without a reward.
 - **Right-click a pigeon** for a small action bubble above its head with Feed,
   Play, and Shoo. Right-click the nest for the general menu, including pause and quit.
+- Open **Dress pigeon** in the nest to preview and equip a ribbon, scarf, cap,
+  or flower. The pigeon looks around and reacts with a happy or displeased face;
+  each bird has a stable style preference based on its personality. Outfits and
+  preferences are saved per bird.
 - Open **Developer settings** in the nest to tune flight speed, roaming distance,
   rest duration, and treasure interval for the current session (these tuning values
   reset when the app closes). The same panel lets you select double-click and/or
@@ -233,20 +237,15 @@ Only the app’s own `nest_data.json` is read/written:
 - Windows: `%LOCALAPPDATA%\DesktopPigeon\nest_data.json`
 - Linux: `${XDG_DATA_HOME:-~/.local/share}/DesktopPigeon/nest_data.json`
 
-The versioned save contains hunger, friendship, traits, food portions, cooldowns,
-game win count, bounded achievements/action counts, neglect/cooldown timers,
-forgiveness, protected synthetic types, and generated item names/types/IDs/times.
-Existing version 1/2/3/4 saves are read without rewriting and upgrade to **version 5**
-on the next successful save, preserving hunger, items, and all existing version 2
-traits/food/friendship/timers/wins. Version 1 has no traits, so migration supplies
-deterministic neutral traits rather than rerolling them. Version 3 preserves
-evolved traits exactly across reloads. Version 4 adds per-bird hunger/lifetime,
-identities, parentage, permanent departure legacy, grace, eggs, nest level/treasury,
-selected ID and social timers. Version 5 adds bounded mutual bonds and structured
-permanent/recent chronicles, retaining every earlier profile, egg, item and legacy.
+The versioned save contains hunger, friendship, traits, food portions, outfits and
+appeal preferences, cooldowns, bounded achievements/action counts, flock history,
+and generated item names/types/IDs/times. Versions 1–6 are read without rewriting
+and upgraded to **version 7** on the next successful save. Migrations preserve
+existing items, profiles, eggs, and legacy; older companions receive a stable
+appeal preference derived from personality and the default Natural outfit.
 All saved fields, counters, finite timers and cross-record references are validated.
 Unsupported/corrupt saves remain intact.
-Downgrading to earlier phases cannot read version 5 saves; keep a
+Downgrading to earlier phases cannot read version 7 saves; keep a
 manual backup of the app's own save before downgrading.
 Saves occur on feeding, collection, every ten active seconds, and exit, using
 atomic replacement. Position and unfinished thefts are not persisted. If a save

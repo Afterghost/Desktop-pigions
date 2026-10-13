@@ -163,6 +163,18 @@ class CompanionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.profile.reward_game(2)
 
+    def test_appeal_preference_is_stable_and_outfits_are_validated(self):
+        profile = Companion(traits={"curiosity": 10, "calm": 20, "sociability": 80})
+        self.assertEqual(profile.appeal_preference, "Ribbon")
+        profile.traits = {"curiosity": 90, "calm": 20, "sociability": 10}
+        self.assertEqual(profile.appeal_preference, "Ribbon")
+        profile.outfit = "Ribbon"
+        self.assertEqual(Companion.from_data(asdict(profile)).outfit, "Ribbon")
+        invalid = asdict(profile)
+        invalid["outfit"] = "Wallpaper"
+        with self.assertRaises(ValueError):
+            Companion.from_data(invalid)
+
 
 class Phase2StorageTests(unittest.TestCase):
     def setUp(self):
@@ -184,7 +196,7 @@ class Phase2StorageTests(unittest.TestCase):
         nest.companion.befriend(25)
         nest.collect(Treasure(GIFTS[0], "Gift", "#e6ad24", 0, 0))
         self.store.save(hunger, nest)
-        self.assertEqual(json.loads(self.store.path.read_text())["version"], 6)
+        self.assertEqual(json.loads(self.store.path.read_text())["version"], 7)
         self.assertEqual(self.store.load(), (hunger, nest))
 
     def test_invalid_phase2_data_is_preserved(self):
@@ -193,7 +205,8 @@ class Phase2StorageTests(unittest.TestCase):
         for field, value in (("friendship", True), ("friendship", 101),
                              ("traits", {}), ("food", {"seed_mix": 4}),
                              ("gift_timer", float("nan")), ("pet_cooldown", -1),
-                             ("games_won", "one")):
+                             ("games_won", "one"), ("outfit", "Wallpaper"),
+                             ("appeal_preference", "Wallpaper")):
             modified = json.loads(json.dumps(data))
             modified["companion"][field] = value
             raw = json.dumps(modified)

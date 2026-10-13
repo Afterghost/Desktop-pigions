@@ -8,7 +8,7 @@ from tkinter import messagebox
 from config import (
     AUTO_FORAGE_INTERVAL, FOOD_TYPES, MOVEMENT_UPDATE_INTERVAL, PIGEON_SIZE, SAVE_INTERVAL,
 )
-from companion import PettingGesture
+from companion import ATTIRE, PettingGesture
 from desktop import Treasure, make_treasure, work_area
 from nest import Nest
 from pigeon import Behavior, Pigeon
@@ -23,6 +23,7 @@ from ui.bird_menu import BirdMenu
 from ui.developer_settings import DeveloperSettings
 from ui.pigeon_sprite import draw_pigeon
 from ui.minigame_window import MinigameWindow
+from ui.dressing_room import DressingRoom
 
 
 TEAR_SEARCH_DELAY = 0.5
@@ -92,6 +93,7 @@ class DesktopPigeonApp:
         self.developer_settings = DeveloperSettings(self)
         self.nest_window = NestWindow(self)
         self.game_window = MinigameWindow(self)
+        self.dressing_room = DressingRoom(self)
         self.bird_menu = BirdMenu(self)
         self.activity_status = ""
         self.menu = tk.Menu(root, tearoff=False)
@@ -312,6 +314,19 @@ class DesktopPigeonApp:
         self.render()
         if show:
             self.nest_window.show()
+        return True
+
+    def set_outfit(self, outfit):
+        if self.closed or self.paused or not self.has_bird or outfit not in ATTIRE:
+            return False
+        self.nest.companion.outfit = outfit
+        preference = self.nest.companion.appeal_preference
+        self.activity_status = (
+            f"{self.flock.selected.name} loves the {outfit.lower()} look!"
+            if outfit == preference else
+            f"{self.flock.selected.name} is unsure about the {outfit.lower()} look.")
+        self.save()
+        self.render()
         return True
 
     def begin_drag(self, item: str, widget) -> bool:
@@ -722,6 +737,7 @@ class DesktopPigeonApp:
             self.game_window.draw_overlay(self.birds[self.game_window.participant].canvas)
         self.nest_window.refresh()
         self.game_window.refresh()
+        self.dressing_room.refresh()
 
     def save(self) -> bool:
         if self.closed or not self.saving_enabled:

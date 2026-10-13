@@ -112,6 +112,8 @@ class FlockStorageTests(unittest.TestCase):
                 else:
                     legacy["progression"].pop("grace")
                 legacy.pop("pet_preference")
+                legacy.pop("outfit")
+                legacy.pop("appeal_preference")
                 data["companion"] = legacy
             raw = json.dumps(data)
             self.store.path.write_text(raw)
@@ -124,7 +126,7 @@ class FlockStorageTests(unittest.TestCase):
                 self.assertEqual(nest.companion.friendship, 47)
                 self.assertEqual(nest.companion.traits, profile["traits"])
             self.store.save(hunger, nest)
-            self.assertEqual(json.loads(self.store.path.read_text())["version"], 6)
+            self.assertEqual(json.loads(self.store.path.read_text())["version"], 7)
             self.assertEqual(self.store.load(), (hunger, nest))
 
     def test_v5_save_migrates_to_stable_pet_speed_preferences(self):
@@ -134,8 +136,12 @@ class FlockStorageTests(unittest.TestCase):
         data = json.loads(self.store.path.read_text())
         data["version"] = 5
         data["companion"].pop("pet_preference")
+        data["companion"].pop("outfit")
+        data["companion"].pop("appeal_preference")
         for bird in data["flock"]["records"]:
             bird["companion"].pop("pet_preference")
+            bird["companion"].pop("outfit")
+            bird["companion"].pop("appeal_preference")
         raw = json.dumps(data)
         self.store.path.write_text(raw)
 
@@ -143,9 +149,34 @@ class FlockStorageTests(unittest.TestCase):
 
         self.assertEqual(self.store.path.read_text(), raw)
         self.assertEqual(migrated.companion.pet_speed_preference, "slow")
+        self.assertEqual(migrated.companion.appeal_preference, "Scarf")
         migrated.companion.traits["calm"] = 10
         migrated.companion.traits["curiosity"] = 100
         self.assertEqual(migrated.companion.pet_speed_preference, "slow")
+
+    def test_v6_save_migrates_outfits_and_stable_appeal_preferences(self):
+        nest = Nest()
+        nest.companion.traits = {"curiosity": 15, "calm": 70, "sociability": 40}
+        nest.flock = Flock.initial(nest.companion)
+        self.store.save(25, nest)
+        data = json.loads(self.store.path.read_text())
+        data["version"] = 6
+        data["companion"].pop("outfit")
+        data["companion"].pop("appeal_preference")
+        for bird in data["flock"]["records"]:
+            bird["companion"].pop("outfit")
+            bird["companion"].pop("appeal_preference")
+        raw = json.dumps(data)
+        self.store.path.write_text(raw)
+
+        _, migrated = self.store.load()
+
+        self.assertEqual(self.store.path.read_text(), raw)
+        self.assertEqual(migrated.companion.outfit, "Natural")
+        self.assertEqual(migrated.companion.appeal_preference, "Scarf")
+        migrated.companion.outfit = "Scarf"
+        self.store.save(25, migrated)
+        self.assertEqual(self.store.load()[1].companion.outfit, "Scarf")
 
     def test_corrupt_flock_fields_and_references_disable_saving(self):
         nest = Nest()

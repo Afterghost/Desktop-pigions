@@ -70,6 +70,8 @@ class NestWindow:
                    command=lambda: app.developer_settings.show()).pack(side="left", padx=5)
         ttk.Button(social, text="Play minigames",
                    command=lambda: app.game_window.show()).pack(side="left", padx=5)
+        ttk.Button(social, text="Dress pigeon",
+                   command=app.dressing_room.show).pack(side="left", padx=5)
         ttk.Button(social, text="Family stories / activity",
                    command=self.stories.show).pack(side="left")
         self.bonds = ttk.Label(frame, wraplength=540)
