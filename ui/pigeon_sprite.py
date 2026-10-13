@@ -119,6 +119,50 @@ def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool,
                                24 + math.sin(radians) * 4 + 3,
                                fill="#ed9aaf", outline="#b95d76")
         canvas.create_oval(x - 2, 22, x + 2, 26, fill="#e7c45b", outline="")
+    elif outfit == "Feather Crown":
+        canvas.create_polygon(*points(59, 25, 57, 13, 63, 20, 67, 10,
+                                     70, 21, 77, 13, 75, 26),
+                              fill="#d7bd69", outline="#8c7540")
+        canvas.create_line(*points(61, 23, 73, 23), fill="#b45b62", width=2)
+    elif outfit == "Postbird Cap":
+        arc(56, 16, 83, 35, start=0, extent=180, style="pieslice",
+            fill="#526f8b", outline="#344b62")
+        canvas.create_line(*points(56, 27, 84, 27), fill="#344b62", width=3)
+        oval(64, 19, 71, 25, fill="#e8d9a3", outline="#8a7547")
+    elif outfit == "Moon Scarf":
+        canvas.create_polygon(*points(55, 50, 78, 50, 75, 58, 57, 58),
+                              fill="#6589bd", outline="#3b5278")
+        canvas.create_polygon(*points(59, 56, 66, 57, 62, 69),
+                              fill="#6589bd", outline="#3b5278")
+        canvas.create_oval(62, 51, 64, 53, fill="#f5e7a2", outline="")
+        canvas.create_oval(69, 53, 71, 55, fill="#f5e7a2", outline="")
+    elif outfit == "Lucky Coin Necklace":
+        arc(57, 47, 76, 63, start=190, extent=160, style="arc",
+            outline="#b28b37", width=2)
+        oval(64, 57, 72, 65, fill="#e5bf58", outline="#8f7133")
+        canvas.create_text(68, 61, text="★", fill="#8f7133",
+                           font=("TkDefaultFont", 6, "bold"))
+    elif outfit == "Toast Necklace":
+        canvas.create_line(*points(57, 49, 66, 61, 76, 49),
+                           fill="#a78046", width=2)
+        canvas.create_polygon(*points(62, 56, 72, 56, 74, 64, 70, 68,
+                                     64, 67, 60, 63),
+                              fill="#e9b969", outline="#9d693c", width=2)
+        canvas.create_polygon(*points(64, 59, 71, 59, 72, 63, 69, 66,
+                                     65, 65, 62, 62),
+                              fill="#f3dfa7", outline="")
+    elif outfit == "Rooftop Jacket":
+        canvas.create_polygon(*points(29, 52, 39, 56, 50, 55, 61, 50,
+                                     66, 67, 58, 74, 35, 73),
+                              fill="#c16d56", outline="#74463f")
+        canvas.create_line(*points(48, 57, 49, 72), fill="#f0d4a3", width=2)
+        for button_y in (61, 67):
+            oval(46, button_y, 48, button_y + 2, fill="#f0d4a3", outline="")
+    elif outfit == "Pigeon Pin":
+        oval(34, 53, 46, 65, fill="#d9c778", outline="#897944")
+        oval(37, 55, 43, 61, fill="#73899d", outline="#485967")
+        canvas.create_polygon(*points(42, 58, 46, 60, 42, 62),
+                              fill="#dcae72", outline="#8a6842")
     for tear in paper_tears:
         progress = min(1, tear["age"] / 0.3)
         fade = min(1, (9 - tear["age"]) / 2)

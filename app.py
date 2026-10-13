@@ -8,7 +8,7 @@ from tkinter import messagebox
 from config import (
     AUTO_FORAGE_INTERVAL, FOOD_TYPES, MOVEMENT_UPDATE_INTERVAL, PIGEON_SIZE, SAVE_INTERVAL,
 )
-from companion import ATTIRE, PettingGesture
+from companion import ATTIRE, RARE_ATTIRE, PettingGesture
 from desktop import Treasure, make_treasure, work_area
 from nest import Nest
 from pigeon import Behavior, Pigeon
@@ -28,6 +28,8 @@ from ui.dressing_room import DressingRoom
 
 TEAR_SEARCH_DELAY = 0.5
 TEAR_FORAGE_CHANCE = 0.35
+FORAGE_ATTIRE_CHANCE = 0.08
+GAME_ATTIRE_CHANCES = {3: 0.03, 4: 0.08, 5: 0.18}
 
 
 class DesktopPigeonApp:
@@ -317,7 +319,9 @@ class DesktopPigeonApp:
         return True
 
     def set_outfit(self, outfit):
-        if self.closed or self.paused or not self.has_bird or outfit not in ATTIRE:
+        if (self.closed or self.paused or not self.has_bird
+                or outfit not in (*ATTIRE, *RARE_ATTIRE)
+                or outfit not in self.nest.companion.wardrobe):
             return False
         self.nest.companion.outfit = outfit
         preference = self.nest.companion.appeal_preference
@@ -508,6 +512,8 @@ class DesktopPigeonApp:
                 or (participant is not None and participant != self.flock.selected_id)):
             return False
         self.nest.companion.reward_game(score)
+        rare_attire = self.nest.companion.try_find_rare_attire(
+            self.rng, GAME_ATTIRE_CHANCES[score])
         self.flock.milestone(self.flock.selected_id, "win")
         trinket = make_treasure(self.pigeon.bounds, self.pigeon.x, self.pigeon.y, self.rng)
         self.nest.collect(trinket, self.nest.companion)
@@ -515,6 +521,8 @@ class DesktopPigeonApp:
         self.activity_status = (
             f"Game complete: +{score} friendship, +2 sunflower portions, "
             f"and a {trinket.name} trinket!")
+        if rare_attire:
+            self.activity_status += f" Rare find: {rare_attire} added to the wardrobe!"
         if score == 5:
             self.activity_status += ", +1 golden corn!"
         self.save()
@@ -777,6 +785,13 @@ class DesktopPigeonApp:
                 self.tear_searches[bird_id] = None
                 record.forage_timer = self._forage_delay(record)
                 if self.rng.random() < TEAR_FORAGE_CHANCE:
+                    rare_attire = record.companion.try_find_rare_attire(
+                        self.rng, FORAGE_ATTIRE_CHANCE)
+                    if rare_attire:
+                        self.activity_status = (
+                            f"{record.name} found rare {rare_attire} after tearing the screen!")
+                        self.save()
+                        return
                     if self.social.start_foraging(
                             record.id, self.flock, self.pigeons,
                             lambda bird: make_treasure(

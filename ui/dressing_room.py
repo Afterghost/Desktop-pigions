@@ -4,7 +4,7 @@ import math
 import tkinter as tk
 from tkinter import ttk
 
-from companion import ATTIRE
+from companion import ATTIRE, RARE_ATTIRE
 from ui.pigeon_sprite import draw_pigeon
 
 
@@ -15,7 +15,7 @@ class DressingRoom:
         self.window = tk.Toplevel(app.root)
         self.window.withdraw()
         self.window.title("Desktop Pigeon — Dressing Room")
-        self.window.geometry("340x390")
+        self.window.geometry("360x460")
         self.window.resizable(False, False)
         self.window.protocol("WM_DELETE_WINDOW", self.window.withdraw)
         frame = ttk.Frame(self.window, padding=12)
@@ -66,9 +66,14 @@ class DressingRoom:
         self.expression.configure(
             text=("♥  Loves this look!" if approved else "Hmm… not quite their style.")
                  + ("  ☺" if approved else "  ☹"))
+        for outfit, button in self.buttons.items():
+            owned = outfit in profile.wardrobe
+            button.configure(
+                state="normal" if owned and not self.app.paused else "disabled",
+                text=(f"✓ {outfit}" if outfit == profile.outfit else outfit)
+                if owned else f"Find: {outfit}",
+            )
         self.preference.configure(
             text=f"{record.name} loves {profile.appeal_preference.lower()} looks. "
-                 f"Current outfit: {profile.outfit.lower()}.")
-        for outfit, button in self.buttons.items():
-            button.configure(state="disabled" if self.app.paused else "normal",
-                             text=f"✓ {outfit}" if outfit == profile.outfit else outfit)
+                 f"Current outfit: {profile.outfit.lower()}. "
+                 f"Wardrobe: {len(profile.wardrobe)}/{len(ATTIRE) + len(RARE_ATTIRE)}.")
