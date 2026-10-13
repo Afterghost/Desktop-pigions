@@ -85,7 +85,7 @@ class Store:
                     if (not isinstance(profile_data, dict)
                             or set(profile_data) != set(Companion.__dataclass_fields__)
                             - {"progression", "pet_preference", "outfit",
-                               "appeal_preference"}):
+                               "appeal_preference", "wardrobe"}):
                         raise ValueError("Invalid legacy companion")
                     profile_data = dict(profile_data, progression=asdict(Progression()),
                                          pet_preference=None)

@@ -114,6 +114,7 @@ class FlockStorageTests(unittest.TestCase):
                 legacy.pop("pet_preference")
                 legacy.pop("outfit")
                 legacy.pop("appeal_preference")
+                legacy.pop("wardrobe")
                 data["companion"] = legacy
             raw = json.dumps(data)
             self.store.path.write_text(raw)
@@ -126,7 +127,7 @@ class FlockStorageTests(unittest.TestCase):
                 self.assertEqual(nest.companion.friendship, 47)
                 self.assertEqual(nest.companion.traits, profile["traits"])
             self.store.save(hunger, nest)
-            self.assertEqual(json.loads(self.store.path.read_text())["version"], 7)
+            self.assertEqual(json.loads(self.store.path.read_text())["version"], 8)
             self.assertEqual(self.store.load(), (hunger, nest))
 
     def test_v5_save_migrates_to_stable_pet_speed_preferences(self):
@@ -138,10 +139,12 @@ class FlockStorageTests(unittest.TestCase):
         data["companion"].pop("pet_preference")
         data["companion"].pop("outfit")
         data["companion"].pop("appeal_preference")
+        data["companion"].pop("wardrobe")
         for bird in data["flock"]["records"]:
             bird["companion"].pop("pet_preference")
             bird["companion"].pop("outfit")
             bird["companion"].pop("appeal_preference")
+            bird["companion"].pop("wardrobe")
         raw = json.dumps(data)
         self.store.path.write_text(raw)
 
@@ -163,9 +166,11 @@ class FlockStorageTests(unittest.TestCase):
         data["version"] = 6
         data["companion"].pop("outfit")
         data["companion"].pop("appeal_preference")
+        data["companion"].pop("wardrobe")
         for bird in data["flock"]["records"]:
             bird["companion"].pop("outfit")
             bird["companion"].pop("appeal_preference")
+            bird["companion"].pop("wardrobe")
         raw = json.dumps(data)
         self.store.path.write_text(raw)
 
@@ -177,6 +182,29 @@ class FlockStorageTests(unittest.TestCase):
         migrated.companion.outfit = "Scarf"
         self.store.save(25, migrated)
         self.assertEqual(self.store.load()[1].companion.outfit, "Scarf")
+
+    def test_v7_save_migrates_a_per_bird_starter_wardrobe(self):
+        nest = Nest()
+        nest.companion.outfit = "Scarf"
+        nest.flock = Flock.initial(nest.companion)
+        self.store.save(25, nest)
+        data = json.loads(self.store.path.read_text())
+        data["version"] = 7
+        data["companion"].pop("wardrobe")
+        for bird in data["flock"]["records"]:
+            bird["companion"].pop("wardrobe")
+        raw = json.dumps(data)
+        self.store.path.write_text(raw)
+
+        _, migrated = self.store.load()
+
+        self.assertEqual(self.store.path.read_text(), raw)
+        self.assertIn("Scarf", migrated.companion.wardrobe)
+        self.assertEqual(migrated.companion.outfit, "Scarf")
+        self.store.save(25, migrated)
+        self.assertEqual(json.loads(self.store.path.read_text())["version"], 8)
+        self.assertEqual(self.store.load()[1].companion.wardrobe,
+                         migrated.companion.wardrobe)
 
     def test_corrupt_flock_fields_and_references_disable_saving(self):
         nest = Nest()

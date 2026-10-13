@@ -6,7 +6,7 @@ import random
 import tempfile
 import unittest
 
-from companion import Companion, GIFTS, PettingGesture
+from companion import Companion, GIFTS, PettingGesture, RARE_ATTIRE
 from desktop import Bounds, Treasure
 from minigames import ShinySorting
 from nest import Nest
@@ -175,6 +175,28 @@ class CompanionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Companion.from_data(invalid)
 
+    def test_rare_attire_unlocks_once_and_is_required_to_equip(self):
+        profile = Companion()
+        rng = random.Random(3)
+        found = profile.try_find_rare_attire(rng, 1)
+        self.assertIn(found, RARE_ATTIRE)
+        self.assertIn(found, profile.wardrobe)
+        self.assertIsNone(profile.try_find_rare_attire(rng, 0))
+        for _ in range(len(RARE_ATTIRE) - 1):
+            profile.try_find_rare_attire(rng, 1)
+        self.assertEqual(len(set(profile.wardrobe)), len(profile.wardrobe))
+        self.assertIsNone(profile.try_find_rare_attire(rng, 1))
+        profile.outfit = found
+        self.assertEqual(Companion.from_data(asdict(profile)).outfit, found)
+        invalid = asdict(profile)
+        invalid["wardrobe"].append(found)
+        with self.assertRaises(ValueError):
+            Companion.from_data(invalid)
+        invalid = asdict(profile)
+        invalid["wardrobe"].remove(profile.outfit)
+        with self.assertRaises(ValueError):
+            Companion.from_data(invalid)
+
 
 class Phase2StorageTests(unittest.TestCase):
     def setUp(self):
@@ -196,7 +218,7 @@ class Phase2StorageTests(unittest.TestCase):
         nest.companion.befriend(25)
         nest.collect(Treasure(GIFTS[0], "Gift", "#e6ad24", 0, 0))
         self.store.save(hunger, nest)
-        self.assertEqual(json.loads(self.store.path.read_text())["version"], 7)
+        self.assertEqual(json.loads(self.store.path.read_text())["version"], 8)
         self.assertEqual(self.store.load(), (hunger, nest))
 
     def test_invalid_phase2_data_is_preserved(self):
@@ -206,7 +228,9 @@ class Phase2StorageTests(unittest.TestCase):
                              ("traits", {}), ("food", {"seed_mix": 4}),
                              ("gift_timer", float("nan")), ("pet_cooldown", -1),
                              ("games_won", "one"), ("outfit", "Wallpaper"),
-                             ("appeal_preference", "Wallpaper")):
+                             ("appeal_preference", "Wallpaper"),
+                             ("wardrobe", ["Natural", "Natural"]),
+                             ("wardrobe", ["Wallpaper"])):
             modified = json.loads(json.dumps(data))
             modified["companion"][field] = value
             raw = json.dumps(modified)

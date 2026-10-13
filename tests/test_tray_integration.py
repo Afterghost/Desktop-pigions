@@ -11,6 +11,7 @@ except ImportError:
     tk = None
 
 from pigeon import Behavior
+from companion import Companion
 
 
 @unittest.skipIf(tk is None, "Tkinter is required")
@@ -35,6 +36,7 @@ class TrayIntegrationTests(unittest.TestCase):
         self.app.treasure_interval = 30
         self.app.rng = random.Random(4)
         self.app.activity_status = ""
+        self.app.save = Mock()
         self.app.social = SimpleNamespace(start_foraging=Mock(return_value=False))
         self.app.render = Mock()
         self.app.feed = Mock()
@@ -68,11 +70,13 @@ class TrayIntegrationTests(unittest.TestCase):
 
         record = SimpleNamespace(
             id="one", name="First", forage_timer=0,
-            companion=SimpleNamespace(traits={"curiosity": 50}))
+            companion=Companion(traits={"curiosity": 50, "calm": 20, "sociability": 30}))
         pigeon = SimpleNamespace(
             treasure=None, behavior=Behavior.IDLE, bounds=object(), x=10, y=20,
             investigate=Mock(return_value=True))
         self.app.rng.random = Mock(return_value=0.1)
+        self.app.rng.uniform = Mock(return_value=20)
+        self.app.rng.random.side_effect = [0.1, 0.9]
         target = object()
         with patch("app.make_treasure", return_value=target) as make_treasure:
             self.app._advance_forage(record, pigeon, 0.25, False)
@@ -94,7 +98,7 @@ class TrayIntegrationTests(unittest.TestCase):
     def test_failed_search_still_requires_next_tear(self):
         record = SimpleNamespace(
             id="one", name="First", forage_timer=0,
-            companion=SimpleNamespace(traits={"curiosity": 50}))
+            companion=Companion(traits={"curiosity": 50, "calm": 20, "sociability": 30}))
         pigeon = SimpleNamespace(treasure=None, behavior=Behavior.IDLE)
         self.app.rng.random = Mock(return_value=0.9)
         self.app._advance_forage(record, pigeon, 0.25, False)
@@ -107,13 +111,33 @@ class TrayIntegrationTests(unittest.TestCase):
     def test_no_search_while_not_idle_and_smoothing_clears_all(self):
         record = SimpleNamespace(
             id="one", name="First", forage_timer=0,
-            companion=SimpleNamespace(traits={"curiosity": 50}))
+            companion=Companion(traits={"curiosity": 50, "calm": 20, "sociability": 30}))
         pigeon = SimpleNamespace(treasure=None, behavior=Behavior.ROAMING)
         self.app._advance_forage(record, pigeon, 1, False)
         self.assertEqual(self.app.paper_tears["one"], [])
         self.assertIsNone(self.app.tear_searches["one"])
         self.app.smooth_tears()
         self.assertEqual(self.app.paper_tears, {"one": [], "two": []})
+
+    def test_rare_attire_is_a_tear_search_find(self):
+        from companion import RARE_ATTIRE
+
+        record = SimpleNamespace(
+            id="one", name="First", forage_timer=0,
+            companion=Companion(traits={"curiosity": 50, "calm": 20, "sociability": 30}))
+        pigeon = SimpleNamespace(
+            treasure=None, behavior=Behavior.IDLE, bounds=object(), x=10, y=20,
+            investigate=Mock(return_value=True))
+        self.app.rng.uniform = Mock(return_value=20)
+        self.app.rng.random = Mock(side_effect=[0.1, 0.0])
+        self.app.rng.choice = Mock(return_value=RARE_ATTIRE[0])
+        self.app._advance_forage(record, pigeon, 0.25, False)
+        self.app._advance_forage(record, pigeon, 0.5, False)
+        self.assertIn(RARE_ATTIRE[0], record.companion.wardrobe)
+        self.assertIn(RARE_ATTIRE[0], self.app.activity_status)
+        self.app.save.assert_called_once_with()
+        self.app.social.start_foraging.assert_not_called()
+        pigeon.investigate.assert_not_called()
 
     def test_sprite_draws_paper_tears_and_feather_play(self):
         from desktop import Bounds

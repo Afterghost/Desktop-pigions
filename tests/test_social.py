@@ -204,10 +204,12 @@ class StoryStorageTests(unittest.TestCase):
         data["companion"].pop("pet_preference")
         data["companion"].pop("outfit")
         data["companion"].pop("appeal_preference")
+        data["companion"].pop("wardrobe")
         for bird in data["flock"]["records"]:
             bird["companion"].pop("pet_preference")
             bird["companion"].pop("outfit")
             bird["companion"].pop("appeal_preference")
+            bird["companion"].pop("wardrobe")
         raw = json.dumps(data)
         self.store.path.write_text(raw)
         hunger, migrated = self.store.load()

@@ -147,6 +147,7 @@ class MigrationTests(unittest.TestCase):
         old_profile.pop("pet_preference")
         old_profile.pop("outfit")
         old_profile.pop("appeal_preference")
+        old_profile.pop("wardrobe")
         for version in (1, 2):
             data = {"version": version, "hunger": 93.5, "items": [item]}
             if version == 2:
@@ -166,7 +167,7 @@ class MigrationTests(unittest.TestCase):
             nest.companion.progression.intervention_cooldown = 7.5
             nest.companion.progression.forage_cooldown = 210
             self.store.save(hunger, nest)
-            self.assertEqual(json.loads(self.store.path.read_text())["version"], 7)
+            self.assertEqual(json.loads(self.store.path.read_text())["version"], 8)
             self.assertEqual((hunger, nest), self.store.load())
             nest.companion.evolve("care")
             self.store.save(hunger, nest)

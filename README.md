@@ -51,9 +51,10 @@ separate from the persistent flock app.
 - **Right-click a pigeon** for a small action bubble above its head with Feed,
   Play, and Shoo. Right-click the nest for the general menu, including pause and quit.
 - Open **Dress pigeon** in the nest to preview and equip a ribbon, scarf, cap,
-  or flower. The pigeon looks around and reacts with a happy or displeased face;
-  each bird has a stable style preference based on its personality. Outfits and
-  preferences are saved per bird.
+  flower, or a rare wearable. Rare wardrobe finds include feather crowns,
+  postbird caps, moon scarves, coin/toast necklaces, rooftop jackets, and pigeon
+  pins. The pigeon looks around and reacts to its favorite style. Each bird's
+  wardrobe, equipped item, and preference are saved separately.
 - Open **Developer settings** in the nest to tune flight speed, roaming distance,
   rest duration, and treasure interval for the current session (these tuning values
   reset when the app closes). The same panel lets you select double-click and/or
@@ -67,7 +68,9 @@ separate from the persistent flock app.
   while resting, a pigeon makes a temporary paper-tear drawing when its forage
   timer expires, then has a **35% chance** to uncover a generated item. A failed
   search must wait for the next tear before trying again; curiosity affects the
-  timer. Friendly shared foraging also starts from a successful tear-triggered search.
+  timer. Successful searches have an additional **8% chance** to find an unowned
+  rare wearable instead of a regular trinket. Friendly shared foraging also starts
+  from a successful tear-triggered search.
 - Use the nest's **drag tray** to drop food onto any active pigeon or a feather
   for a brief play animation. **Smooth it out** clears temporary tear drawings.
 - Watch **Investigating → Approaching → Theft attempt → Escaping → Nest storage**.
@@ -124,7 +127,9 @@ separate from the persistent flock app.
   All games are untimed, five-turn MVPs with on-overlay instructions and the same
   3+ correct reward rule. Winning earns a generated nest trinket plus two sunflower
   portions; a perfect score also earns golden corn. Pause disables all answers and
-  memory hiding. Return earned trinkets from the nest inventory to build friendship.
+  memory hiding. Wins also have a score-based chance to find an unowned rare wearable:
+  3% for three correct, 8% for four, and 18% for a perfect score. Return earned
+  trinkets from the nest inventory to build friendship.
   Closing/Escape/cancelling a game discards the round **without rewards**.
   Unfinished games reset on app exit. The other minigames intentionally use small
   turn-based mechanics rather than real-time arcade simulations.
@@ -237,15 +242,15 @@ Only the app’s own `nest_data.json` is read/written:
 - Windows: `%LOCALAPPDATA%\DesktopPigeon\nest_data.json`
 - Linux: `${XDG_DATA_HOME:-~/.local/share}/DesktopPigeon/nest_data.json`
 
-The versioned save contains hunger, friendship, traits, food portions, outfits and
-appeal preferences, cooldowns, bounded achievements/action counts, flock history,
-and generated item names/types/IDs/times. Versions 1–6 are read without rewriting
-and upgraded to **version 7** on the next successful save. Migrations preserve
+The versioned save contains hunger, friendship, traits, food portions, owned and
+equipped outfits, appeal preferences, cooldowns, bounded achievements/action counts,
+flock history, and generated item names/types/IDs/times. Versions 1–7 are read without
+rewriting and upgraded to **version 8** on the next successful save. Migrations preserve
 existing items, profiles, eggs, and legacy; older companions receive a stable
-appeal preference derived from personality and the default Natural outfit.
+appeal preference derived from personality and the default starter wardrobe.
 All saved fields, counters, finite timers and cross-record references are validated.
 Unsupported/corrupt saves remain intact.
-Downgrading to earlier phases cannot read version 7 saves; keep a
+Downgrading to earlier phases cannot read version 8 saves; keep a
 manual backup of the app's own save before downgrading.
 Saves occur on feeding, collection, every ten active seconds, and exit, using
 atomic replacement. Position and unfinished thefts are not persisted. If a save
