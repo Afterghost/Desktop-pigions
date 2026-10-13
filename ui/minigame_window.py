@@ -16,8 +16,9 @@ class MinigameWindow:
         self.overlay_open = False
         self.hit_regions = []
         self.panel_shift = 0
-        self.window = app.root
-        frame = ttk.Frame(app.root, padding=16)
+        self.window = tk.Toplevel(app.root)
+        self.window.withdraw()
+        frame = ttk.Frame(self.window, padding=16)
         frame.pack(fill="both", expand=True)
         self.selection = tk.StringVar(value="Shiny Sorting")
         self.selector = ttk.Combobox(frame, textvariable=self.selection, values=GAME_NAMES, state="readonly")
