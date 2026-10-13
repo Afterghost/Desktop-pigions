@@ -50,6 +50,11 @@ class DesktopPigeonApp:
         self.pigeons = {}
         self.birds = {}
         self.targets = {}
+        self.paper_tears = {}
+        self.tear_timers = {}
+        self.play_effects = {}
+        self.drag_item = None
+        self.drag_widget = None
         self.pet_gestures = {}
         self.effects = []
         self.social = SocialMotion()
@@ -110,6 +115,7 @@ class DesktopPigeonApp:
                            self.shiny_overlay if index == 0 else None)
         self._link_selection()
         root.bind_all("<KeyPress>", self._handle_keypress, add="+")
+        root.bind_all("<ButtonRelease-1>", self._finish_drag, add="+")
         root.bind("<Escape>", lambda event: self.close()
                   if event.widget.winfo_toplevel() == root else None)
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -189,6 +195,9 @@ class DesktopPigeonApp:
         if event.keysym == "Escape" and self.pointer_thief is not None:
             self._restore_pointer()
             return "break"
+        if event.keysym == "Escape" and self.drag_item is not None:
+            self._cancel_drag()
+            return "break"
         if self._key_capture_callback is not None:
             callback, self._key_capture_callback = self._key_capture_callback, None
             callback(event.keysym)
@@ -229,6 +238,9 @@ class DesktopPigeonApp:
         pigeon.rest_scale = self.rest_scale
         pigeon.x, pigeon.y = self.bounds.clamp(pigeon.x + len(self.pigeons) * 100, pigeon.y)
         self.pigeons[record.id] = pigeon
+        self.paper_tears[record.id] = []
+        self.tear_timers[record.id] = self.rng.uniform(3, 8)
+        self.play_effects[record.id] = 0.0
         overlay = overlay or Overlay(tk.Toplevel(self.root), PIGEON_SIZE)
         target = target or Overlay(tk.Toplevel(self.root), 40)
         self.birds[record.id] = overlay
@@ -293,6 +305,77 @@ class DesktopPigeonApp:
             self.nest_window.show()
         return True
 
+    def begin_drag(self, item: str, widget) -> bool:
+        if (self.closed or self.paused or item not in (*FOOD_TYPES, "feather")
+                or self.drag_item is not None):
+            return False
+        self.drag_item = item
+        self.drag_widget = widget
+        try:
+            widget.grab_set_global()
+        except tk.TclError:
+            self.drag_item = None
+            self.drag_widget = None
+            return False
+        self.activity_status = (
+            f"Dragging {item.replace('_', ' ')} — drop it on a pigeon; Escape cancels.")
+        self.render()
+        return True
+
+    def _cancel_drag(self) -> None:
+        widget, self.drag_widget = self.drag_widget, None
+        self.drag_item = None
+        if widget is not None:
+            try:
+                widget.grab_release()
+            except tk.TclError:
+                pass
+        self.activity_status = "Tray drag cancelled."
+        self.render()
+
+    def _finish_drag(self, event=None):
+        if self.drag_item is None:
+            return
+        item, self.drag_item = self.drag_item, None
+        widget, self.drag_widget = self.drag_widget, None
+        if widget is not None:
+            try:
+                widget.grab_release()
+            except tk.TclError:
+                pass
+        try:
+            x, y = self.root.winfo_pointerxy()
+        except tk.TclError:
+            return "break"
+        self.drop_from_tray(item, x, y)
+        return "break"
+
+    def drop_from_tray(self, item: str, x: int, y: int) -> bool:
+        if self.closed or self.paused or item not in (*FOOD_TYPES, "feather"):
+            return False
+        bird_id = next((identity for identity, pigeon in self.pigeons.items()
+                        if pigeon.x <= x < pigeon.x + PIGEON_SIZE
+                        and pigeon.y <= y < pigeon.y + PIGEON_SIZE), None)
+        if bird_id is None:
+            self.activity_status = "Drop the food or feather onto a pigeon."
+            self.render()
+            return False
+        if bird_id != self.flock.selected_id:
+            self.select_bird(bird_id)
+        if item == "feather":
+            self.play_effects[bird_id] = 2.0
+            self.activity_status = f"{self.flock.selected.name} played with a feather."
+            self.render()
+            return True
+        self.feed(item)
+        return True
+
+    def smooth_tears(self) -> None:
+        for tears in self.paper_tears.values():
+            tears.clear()
+        self.activity_status = "Smoothed out the temporary paper tears."
+        self.render()
+
     def upgrade_nest(self):
         if self.closed or self.paused:
             return
@@ -339,6 +422,9 @@ class DesktopPigeonApp:
             self.social.cancel(self.pigeons)
         pigeon = self.pigeons.pop(record.id)
         pigeon.cancel_theft()
+        self.paper_tears.pop(record.id, None)
+        self.tear_timers.pop(record.id, None)
+        self.play_effects.pop(record.id, None)
         overlay = self.birds.pop(record.id)
         target = self.targets.pop(record.id)
         overlay.hide()
@@ -510,6 +596,7 @@ class DesktopPigeonApp:
                 self.social.avoidance and record.id == self.social.avoidance[0]) or (
                 self.social.greeting and record.id in self.social.greeting[:2])
             collected = pigeon.step(active_seconds, social_movement=bool(controlled))
+            self._advance_cosmetics(record.id, pigeon, active_seconds)
             record.hunger = pigeon.hunger
             record.lifetime = min(LIFETIME_LIMIT, record.lifetime + active_seconds)
             progress.advance(active_seconds, pigeon.hunger)
@@ -592,7 +679,9 @@ class DesktopPigeonApp:
         for bird_id, pigeon in self.pigeons.items():
             overlay = self.birds[bird_id]
             draw_pigeon(overlay.canvas, pigeon, self.elapsed, self.paused,
-                        holding_pointer=bird_id == self.pointer_thief)
+                        holding_pointer=bird_id == self.pointer_thief,
+                        paper_tears=self.paper_tears[bird_id],
+                        feather_playing=self.play_effects[bird_id] > 0)
             label = self.social.labels.get(bird_id)
             if label:
                 overlay.canvas.create_text(PIGEON_SIZE // 2, 12, text=label,
@@ -622,9 +711,31 @@ class DesktopPigeonApp:
             self.nest_window.show()
             return False
 
+    def _advance_cosmetics(self, bird_id, pigeon, seconds):
+        tears = self.paper_tears[bird_id]
+        for tear in tears:
+            tear["age"] += seconds
+        tears[:] = [tear for tear in tears if tear["age"] < 9]
+        self.play_effects[bird_id] = max(0, self.play_effects[bird_id] - seconds)
+        if pigeon.behavior == Behavior.IDLE:
+            self.tear_timers[bird_id] -= seconds
+            if self.tear_timers[bird_id] <= 0:
+                if len(tears) < 8:
+                    tears.append({
+                        "x": self.rng.uniform(15, PIGEON_SIZE - 15),
+                        "y": self.rng.uniform(38, PIGEON_SIZE - 12),
+                        "age": 0.0,
+                        "angle": self.rng.uniform(-0.5, 0.5),
+                    })
+                self.tear_timers[bird_id] = self.rng.uniform(3, 8)
+        else:
+            self.tear_timers[bird_id] = max(self.tear_timers[bird_id], 1.0)
+
     def close(self) -> None:
         if self.closed:
             return
+        if self.drag_item is not None:
+            self._cancel_drag()
         self._restore_pointer()
         if self.saving_enabled and not self.save():
             if not messagebox.askyesno("Local save failed",

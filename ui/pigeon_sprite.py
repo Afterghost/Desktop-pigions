@@ -20,7 +20,8 @@ def _trait_color(pigeon: Pigeon, palette: dict[str, str], fallback: str) -> str:
 
 
 def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool,
-                holding_pointer: bool = False) -> None:
+                holding_pointer: bool = False, paper_tears=(),
+                feather_playing: bool = False) -> None:
     canvas.delete("all")
     body_color = _trait_color(
         pigeon, {"curiosity": "#aab4c4", "calm": "#a7b6ae", "sociability": "#b6a6b3"},
@@ -81,3 +82,21 @@ def draw_pigeon(canvas: tk.Canvas, pigeon: Pigeon, phase: float, paused: bool,
     if pigeon.carrying and pigeon.treasure is not None:
         canvas.create_polygon(*points(88, 43, 95, 50, 88, 57, 81, 50),
                               fill=pigeon.treasure.color, outline="#7c6537")
+    for tear in paper_tears:
+        progress = min(1, tear["age"] / 0.3)
+        fade = min(1, (9 - tear["age"]) / 2)
+        size = 17 * progress * fade
+        x, y = tear["x"], tear["y"]
+        canvas.create_polygon(x - size, y, x - size / 3, y - 3, x, y + 2,
+                              x + size, y, x + size * 0.3, y + size * 0.55,
+                              fill="#f3ecd9", outline="#b7ac94")
+        for index in range(2):
+            sx = x + math.sin(tear["angle"] + index * 2) * tear["age"] * 5
+            sy = y + progress * (8 + index * 5)
+            small = 2.5 * fade
+            canvas.create_polygon(sx - small, sy, sx + small, sy - small,
+                                  sx + small / 2, sy + small,
+                                  fill="#e2d6ba", outline="")
+    if feather_playing:
+        canvas.create_oval(70, 50, 83, 68, fill="#c8a2d4", outline="#876094")
+        canvas.create_line(80, 52, 73, 70, fill="#785785", width=2)

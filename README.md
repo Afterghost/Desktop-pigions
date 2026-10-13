@@ -23,15 +23,20 @@ Linux: install your distribution’s Tkinter package (e.g. `python3-tk`) and use
 backgrounds; other platforms use small opaque tiles as a preview fallback.
 Windows is the intended desktop target; multi-monitor roaming is not implemented.
 
-## Separate session-local interaction prototype
+## Drag tray and paper effects
 
-Run `python interaction_app.py` (or `py interaction_app.py` on Windows) for the
-alternative drag-food/feather and cosmetic paper-tear prototype. Add `--preview`
-for a normal window; non-Windows platforms use that preview automatically.
-Drag treats from the edge tray, or use **Smooth it out** to clear temporary tears.
-This alternative keeps everything in memory, resets on exit, and does not read,
-write, or share the flock app's saves. The default `py main.py` remains the
-persistent flock companion described below.
+The persistent `main.py` app includes a pantry tray in the nest. Drag an available
+food onto any pigeon to feed it using that bird's saved food portions and care
+progression; seed mix remains free. Drag a play feather onto a pigeon for a short
+cosmetic play animation without bypassing minigame rewards. Existing feed buttons
+remain available. Idle pigeons occasionally make temporary paper-tear drawings;
+they fade automatically, or **Smooth it out** clears them immediately. These
+effects are session-only and never change the save format.
+
+`python interaction_app.py` (or `py interaction_app.py` on Windows) remains an
+optional, standalone interaction prototype. Add `--preview` for a normal window;
+non-Windows platforms use that preview automatically. Its in-memory state is
+separate from the persistent flock app.
 
 ## Controls and gameplay
 
@@ -57,6 +62,9 @@ persistent flock companion described below.
 - **Offer a shiny** starts a collection immediately. The pigeon also finds one
   automatically after about six seconds, then every 21–39 seconds depending on
   curiosity, when available.
+- Use the nest's **drag tray** to drop food onto any active pigeon or a feather
+  for a brief play animation. Idle pigeons may tear temporary paper drawings;
+  **Smooth it out** clears every bird's drawings.
 - Watch **Investigating → Approaching → Theft attempt → Escaping → Nest storage**.
   A pulsing diamond and carried fragment are *only drawings*: nothing is taken
   from a real desktop icon or file.
